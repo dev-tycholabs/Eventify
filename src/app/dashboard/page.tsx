@@ -1,0 +1,123 @@
+"use client";
+
+import { useState } from "react";
+import { useAccount } from "wagmi";
+import { TicketGalleryFromDB } from "@/components/dashboard/TicketGalleryFromDB";
+import { TransactionHistoryFromDB } from "@/components/dashboard/TransactionHistoryFromDB";
+
+type TabType = "tickets" | "history";
+type TicketFilter = "all" | "unlisted" | "listed";
+
+export default function DashboardPage() {
+    const { isConnected, address } = useAccount();
+    const [activeTab, setActiveTab] = useState<TabType>("tickets");
+    const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
+
+    // Protected route - require wallet connection
+    if (!isConnected) {
+        return (
+            <div className="min-h-screen bg-slate-900 pt-24 pb-12">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                        <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center mb-6">
+                            <svg
+                                className="w-10 h-10 text-purple-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1.5}
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                />
+                            </svg>
+                        </div>
+                        <h1 className="text-2xl font-bold text-white mb-3">
+                            Connect Your Wallet
+                        </h1>
+                        <p className="text-gray-400 max-w-md mb-6">
+                            Please connect your wallet to view your tickets and transaction history.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-slate-900 pt-24 pb-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Page Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-white mb-2">My Dashboard</h1>
+                    <p className="text-gray-400">
+                        Manage your tickets and view transaction history
+                    </p>
+                </div>
+
+                {/* Tab Navigation with Filter */}
+                <div className="flex items-center justify-between mb-8 border-b border-white/10">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setActiveTab("tickets")}
+                            className={`px-6 py-3 text-sm font-medium transition-colors relative cursor-pointer ${activeTab === "tickets"
+                                ? "text-white"
+                                : "text-gray-400 hover:text-white"
+                                }`}
+                        >
+                            My Tickets
+                            {activeTab === "tickets" && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("history")}
+                            className={`px-6 py-3 text-sm font-medium transition-colors relative cursor-pointer ${activeTab === "history"
+                                ? "text-white"
+                                : "text-gray-400 hover:text-white"
+                                }`}
+                        >
+                            Transaction History
+                            {activeTab === "history" && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Filter Dropdown - Only show on tickets tab */}
+                    {activeTab === "tickets" && (
+                        <div className="relative pb-3">
+                            <select
+                                value={ticketFilter}
+                                onChange={(e) => setTicketFilter(e.target.value as TicketFilter)}
+                                className="bg-slate-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2 pr-8 cursor-pointer hover:border-purple-500/50 focus:outline-none focus:border-purple-500 transition-colors"
+                                style={{
+                                    WebkitAppearance: "none",
+                                    MozAppearance: "none",
+                                    appearance: "none",
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+                                    backgroundRepeat: "no-repeat",
+                                    backgroundPosition: "right 0.5rem center",
+                                    backgroundSize: "1rem",
+                                }}
+                            >
+                                <option value="all">All</option>
+                                <option value="unlisted">Unlisted</option>
+                                <option value="listed">Listed</option>
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === "tickets" ? (
+                    <TicketGalleryFromDB address={address!} filter={ticketFilter} />
+                ) : (
+                    <TransactionHistoryFromDB address={address!} />
+                )}
+            </div>
+        </div>
+    );
+}

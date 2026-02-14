@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Clones",
+  "sourceName": "@openzeppelin/contracts/proxy/Clones.sol",
+  "abi": [],
+  "bytecode": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea2646970667358221220df39fec96acb0fa343041e1e6dcee0874e25e4c7464cbb1b2fab241573bdeded64736f6c63430008190033",
+  "deployedBytecode": "0x600080fdfea2646970667358221220df39fec96acb0fa343041e1e6dcee0874e25e4c7464cbb1b2fab241573bdeded64736f6c63430008190033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

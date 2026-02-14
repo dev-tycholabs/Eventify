@@ -1,0 +1,17 @@
+{
+  "network": "etherlinkTestnet",
+  "chainId": 127823,
+  "deployer": "0x0b310BAb859B4d3D37084dD6A32f03389618B605",
+  "contracts": {
+    "Registry": "0xDb3B9b7AC97D51D825aA43733D3f4aA49fe8B4Da",
+    "TicketMarketplace": "0xFBC5f575A39D97a15545F095B92fA23BAa3ea075",
+    "RoyaltySplitter": "0x9273391df6651941Fd02a674A5FB849e721F0094",
+    "EventFactory": "0x6885809b6894B8Dfa5BA92f01fEd1031E96007Ae"
+  },
+  "config": {
+    "platformFeePercent": 2.5,
+    "defaultRoyaltyPercent": 5,
+    "maxResalePricePercent": 110
+  },
+  "deployedAt": "2026-02-10T18:21:59.516Z"
+}

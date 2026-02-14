@@ -1,0 +1,21 @@
+{
+  "name": "eventify-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for decentralized event ticketing platform",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.2",
+    "dotenv": "^16.0.3",
+    "hardhat": "^2.13.0",
+    "hardhat-preprocessor": "^0.1.5"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy-ticketing.js --network hardhat",
+    "deploy:etherlink-testnet": "hardhat run scripts/deploy-ticketing.js --network etherlinkTestnet",
+    "deploy:etherlink": "hardhat run scripts/deploy-ticketing.js --network etherlink"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3"
+  }
+}
