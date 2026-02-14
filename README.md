@@ -1,5 +1,5 @@
 # 🎫 Eventify - Decentralized Event Ticketing Platform
-
+![alt text](image.png)
 > **Full-stack event platform for online and offline events — NFT tickets, secondary marketplace, token-gated communities, and API-as-a-service on Etherlink**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?logo=next.js)](https://nextjs.org/)
