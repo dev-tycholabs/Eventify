@@ -146,7 +146,7 @@ chat_messages            -- Token-gated chat (with Realtime)
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/eventify.git
+git clone https://github.com/dev-tycholabs/Eventify.git
 cd eventify
 ```
 
