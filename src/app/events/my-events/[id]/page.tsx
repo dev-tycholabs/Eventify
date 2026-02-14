@@ -10,6 +10,7 @@ import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
 import { EventTicketScanner } from "@/components/events/EventTicketScanner";
 import { RoyaltySplitterPanel } from "@/components/events/RoyaltySplitterPanel";
+import { EventAttendeesPanel } from "@/components/events/EventAttendeesPanel";
 
 interface RoyaltyRecipientData {
     id: string;
@@ -18,6 +19,30 @@ interface RoyaltyRecipientData {
     percentage: number;
     royalty_earned: string;
     royalty_claimed: string;
+}
+
+interface ResaleListing {
+    id: string;
+    listing_id: string;
+    token_id: string;
+    seller_address: string;
+    buyer_address: string | null;
+    price: string;
+    status: "active" | "sold" | "cancelled";
+    listed_at: string;
+    sold_at: string | null;
+    cancelled_at: string | null;
+}
+
+interface ResaleStats {
+    totalListings: number;
+    activeListings: number;
+    soldListings: number;
+    cancelledListings: number;
+    totalResaleVolume: bigint;
+    avgResalePrice: bigint;
+    highestResalePrice: bigint;
+    listings: ResaleListing[];
 }
 
 interface EventData {
@@ -35,6 +60,7 @@ interface EventData {
     imageUrl: string | null;
     royaltySplitterAddress: string | null;
     royaltyRecipients: RoyaltyRecipientData[];
+    resaleStats: ResaleStats;
 }
 
 export default function EventManagePage() {
@@ -49,7 +75,7 @@ export default function EventManagePage() {
     const [eventData, setEventData] = useState<EventData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "scanner" | "royalties" | "settings">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "attendees" | "scanner" | "royalties" | "settings">("overview");
     const [newBaseURI, setNewBaseURI] = useState("");
     const [currentBaseURI, setCurrentBaseURI] = useState<string>("");
     const [isUpdatingURI, setIsUpdatingURI] = useState(false);
@@ -76,7 +102,7 @@ export default function EventManagePage() {
                 return;
             }
 
-            const { event, royaltyRecipients: dbRoyaltyRecipients } = await response.json();
+            const { event, royaltyRecipients: dbRoyaltyRecipients, resaleListings } = await response.json();
 
             if (!event || !event.contract_address) {
                 setError("Event not found or not published");
@@ -96,6 +122,25 @@ export default function EventManagePage() {
                 }
             }
 
+            // Compute resale stats
+            const listings: ResaleListing[] = resaleListings || [];
+            const soldListings = listings.filter((l: ResaleListing) => l.status === "sold");
+            const soldPrices = soldListings.map((l: ResaleListing) => BigInt(l.price || "0"));
+            const totalResaleVolume = soldPrices.reduce((sum: bigint, p: bigint) => sum + p, BigInt(0));
+            const highestResalePrice = soldPrices.length > 0 ? soldPrices.reduce((max: bigint, p: bigint) => p > max ? p : max, BigInt(0)) : BigInt(0);
+            const avgResalePrice = soldPrices.length > 0 ? totalResaleVolume / BigInt(soldPrices.length) : BigInt(0);
+
+            const resaleStats: ResaleStats = {
+                totalListings: listings.length,
+                activeListings: listings.filter((l: ResaleListing) => l.status === "active").length,
+                soldListings: soldListings.length,
+                cancelledListings: listings.filter((l: ResaleListing) => l.status === "cancelled").length,
+                totalResaleVolume,
+                avgResalePrice,
+                highestResalePrice,
+                listings,
+            };
+
             setEventData({
                 id: event.id,
                 name: event.name,
@@ -111,6 +156,7 @@ export default function EventManagePage() {
                 imageUrl: event.image_url,
                 royaltySplitterAddress: event.royalty_splitter_address || null,
                 royaltyRecipients: dbRoyaltyRecipients || [],
+                resaleStats,
             });
         } catch (err) {
             console.error("Failed to fetch event:", err);
@@ -382,6 +428,16 @@ export default function EventManagePage() {
                             )}
                         </button>
                         <button
+                            onClick={() => setActiveTab("attendees")}
+                            className={`px-6 py-3 text-sm font-medium transition-colors relative cursor-pointer ${activeTab === "attendees" ? "text-white" : "text-gray-400 hover:text-white"
+                                }`}
+                        >
+                            Attendees
+                            {activeTab === "attendees" && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />
+                            )}
+                        </button>
+                        <button
                             onClick={() => setActiveTab("scanner")}
                             className={`px-6 py-3 text-sm font-medium transition-colors relative cursor-pointer ${activeTab === "scanner" ? "text-white" : "text-gray-400 hover:text-white"
                                 }`}
@@ -475,6 +531,82 @@ export default function EventManagePage() {
                                 </div>
                             </div>
 
+                            {/* Resale Activity */}
+                            <div className="bg-slate-800/50 rounded-xl p-6 border border-white/10">
+                                <h3 className="text-sm font-medium text-gray-400 mb-4">Secondary Market Activity</h3>
+                                {eventData.resaleStats.totalListings === 0 ? (
+                                    <p className="text-sm text-gray-500">No resale activity yet for this event.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {/* Resale Stats Grid */}
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Listed</p>
+                                                <p className="text-lg font-semibold text-white">{eventData.resaleStats.totalListings}</p>
+                                            </div>
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Active</p>
+                                                <p className="text-lg font-semibold text-yellow-400">{eventData.resaleStats.activeListings}</p>
+                                            </div>
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Sold</p>
+                                                <p className="text-lg font-semibold text-green-400">{eventData.resaleStats.soldListings}</p>
+                                            </div>
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Cancelled</p>
+                                                <p className="text-lg font-semibold text-gray-400">{eventData.resaleStats.cancelledListings}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Volume Stats */}
+                                        {eventData.resaleStats.soldListings > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                <div className="bg-slate-900/50 rounded-lg p-3">
+                                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Resale Volume</p>
+                                                    <p className="text-lg font-semibold text-green-400">{formatEther(eventData.resaleStats.totalResaleVolume)} XTZ</p>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3">
+                                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Avg Resale Price</p>
+                                                    <p className="text-lg font-semibold text-purple-400">{formatEther(eventData.resaleStats.avgResalePrice)} XTZ</p>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3">
+                                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Highest Sale</p>
+                                                    <p className="text-lg font-semibold text-pink-400">{formatEther(eventData.resaleStats.highestResalePrice)} XTZ</p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Recent Resale Listings */}
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Recent Listings</p>
+                                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                                {eventData.resaleStats.listings.slice(0, 10).map((listing) => (
+                                                    <div key={listing.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <span className="text-sm text-white font-mono">#{listing.token_id}</span>
+                                                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${listing.status === "active"
+                                                                ? "bg-yellow-500/20 text-yellow-400"
+                                                                : listing.status === "sold"
+                                                                    ? "bg-green-500/20 text-green-400"
+                                                                    : "bg-gray-500/20 text-gray-400"
+                                                                }`}>
+                                                                {listing.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-right flex-shrink-0">
+                                                            <p className="text-sm font-medium text-white">{formatEther(BigInt(listing.price || "0"))} XTZ</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {new Date(listing.listed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Contract Info */}
                             <div className="bg-slate-800/50 rounded-xl p-6 border border-white/10">
                                 <h3 className="text-sm font-medium text-gray-400 mb-4">Contract Information</h3>
@@ -502,6 +634,11 @@ export default function EventManagePage() {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {/* Attendees Tab */}
+                    {activeTab === "attendees" && (
+                        <EventAttendeesPanel eventId={eventData.id} />
                     )}
 
                     {/* Scanner Tab */}

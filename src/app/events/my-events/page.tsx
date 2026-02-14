@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useSupabase } from "@/hooks/useSupabase";
 import { useOrganizerEventsFromDB, type OrganizerEventFromDB } from "@/hooks/useOrganizerEventsFromDB";
 import { EventManageCard, EventManageModal } from "@/components/events";
@@ -22,6 +22,7 @@ export default function MyEventsPage() {
         refetch: refetchOnChain
     } = useOrganizerEventsFromDB();
     const { writeContractAsync } = useWriteContract();
+    const publicClient = usePublicClient();
 
     const [draftEvents, setDraftEvents] = useState<Event[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -71,11 +72,14 @@ export default function MyEventsPage() {
     const handleWithdraw = async (event: OrganizerEventFromDB) => {
         try {
             txToast.pending("Withdrawing funds...");
-            await writeContractAsync({
+            const hash = await writeContractAsync({
                 address: event.contractAddress,
                 abi: EventTicketABI,
                 functionName: "withdrawFunds",
             });
+            if (publicClient) {
+                await publicClient.waitForTransactionReceipt({ hash });
+            }
             txToast.success("Funds withdrawn successfully!");
             await refetchOnChain();
         } catch (err) {

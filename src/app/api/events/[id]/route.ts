@@ -45,9 +45,21 @@ export async function GET(
             console.error("Error fetching royalty recipients:", royaltyError);
         }
 
+        // Fetch marketplace listings (resales) for this event
+        const { data: resaleListings, error: resaleError } = await supabase
+            .from("marketplace_listings")
+            .select("id, listing_id, token_id, seller_address, buyer_address, price, status, listed_at, sold_at, cancelled_at")
+            .eq("event_id", id)
+            .order("listed_at", { ascending: false });
+
+        if (resaleError) {
+            console.error("Error fetching resale listings:", resaleError);
+        }
+
         return NextResponse.json({
             event: data,
-            royaltyRecipients: royaltyRecipients || []
+            royaltyRecipients: royaltyRecipients || [],
+            resaleListings: resaleListings || [],
         });
     } catch (error) {
         console.error("Error fetching event:", error);

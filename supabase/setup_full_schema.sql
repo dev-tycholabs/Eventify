@@ -346,22 +346,22 @@ CREATE POLICY "Chat messages can be updated"
 
 -- Auto-update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Atomically increment sold_count for an event
 CREATE OR REPLACE FUNCTION increment_sold_count(contract_addr TEXT)
-RETURNS void AS $
+RETURNS void AS $$
 BEGIN
     UPDATE events
     SET sold_count = sold_count + 1
     WHERE contract_address = contract_addr;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 7. TRIGGERS

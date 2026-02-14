@@ -1,3 +1,4 @@
+export { EventAttendeesPanel } from "./EventAttendeesPanel";
 export { EventCalendarFilter } from "./EventCalendarFilter";
 export { EventCard } from "./EventCard";
 export { EventCardSkeleton } from "./EventCardSkeleton";
