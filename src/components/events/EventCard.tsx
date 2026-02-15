@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatEther } from "viem";
 import type { Event } from "@/types/event";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface EventCardProps {
     event: Event;
@@ -10,6 +11,7 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, showDistance }: EventCardProps) {
+    const { currencySymbol } = useChainConfig();
     const formattedDate = event.date.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -109,7 +111,7 @@ export function EventCard({ event, showDistance }: EventCardProps) {
                         <div>
                             <p className="text-xs text-gray-500 uppercase tracking-wide">Price</p>
                             <p className="text-lg font-bold text-white">
-                                {formatEther(event.ticketPrice)} XTZ
+                                {formatEther(event.ticketPrice)} {currencySymbol}
                             </p>
                         </div>
                         <div className="text-right">

@@ -7,7 +7,8 @@ import {
     useAccount,
     usePublicClient,
 } from "wagmi";
-import { CONTRACT_ADDRESSES, EventFactoryABI, EventTicketABI } from "./contracts";
+import { EventFactoryABI, EventTicketABI } from "./contracts";
+import { useChainConfig } from "./useChainConfig";
 import { ErrorCode, type AppError } from "@/types/errors";
 import { txToast } from "@/utils/toast";
 
@@ -31,12 +32,13 @@ export function useOrganizerEvents() {
     const [organizerEvents, setOrganizerEvents] = useState<OrganizerEvent[]>([]);
     const { address, isConnected } = useAccount();
     const publicClient = usePublicClient();
+    const { contracts } = useChainConfig();
 
     const { writeContractAsync } = useWriteContract();
 
     // Fetch events by organizer
     const { data: eventAddresses, refetch: refetchAddresses } = useReadContract({
-        address: CONTRACT_ADDRESSES.EventFactory,
+        address: contracts?.EventFactory,
         abi: EventFactoryABI,
         functionName: "getEventsByOrganizer",
         args: address ? [address] : undefined,

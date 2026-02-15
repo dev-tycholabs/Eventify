@@ -12,6 +12,7 @@ import { LocationPicker } from "@/components/LocationPicker";
 import { EventTypeSelect } from "@/components/EventTypeSelect";
 import type { EventCreationForm, EventType, RoyaltyRecipient, MediaFile } from "@/types/event";
 import type { LocationValue } from "@/components/LocationPicker";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 type DeploymentStatus = "idle" | "deploying" | "success" | "error";
 
@@ -34,6 +35,7 @@ export default function CreateEventPage() {
     const { address, isConnected } = useAccount();
     const { createEvent, isLoading, error } = useEventFactory();
     const { saveDraft: saveDraftToSupabase, publishEvent, getEvents } = useSupabase();
+    const { explorerUrl, currencySymbol } = useChainConfig();
 
     const [form, setForm] = useState<EventCreationForm>({
         name: "",
@@ -741,10 +743,10 @@ export default function CreateEventPage() {
                             </div>
                             <div className="flex-1">
                                 <h3 className="text-lg font-semibold text-green-400 mb-1">Event Created Successfully!</h3>
-                                <p className="text-green-400/70 text-sm mb-3">Your event contract has been deployed to Etherlink.</p>
+                                <p className="text-green-400/70 text-sm mb-3">Your event contract has been deployed successfully.</p>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <a
-                                        href={`https://shadownet.explorer.etherlink.com/tx/${txHash}`}
+                                        href={`${explorerUrl}/tx/${txHash}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 text-sm text-green-400 hover:text-green-300"
@@ -1133,7 +1135,7 @@ export default function CreateEventPage() {
                         {/* Ticket Price */}
                         <div>
                             <label htmlFor="ticketPrice" className="block text-sm font-medium text-gray-300 mb-2">
-                                Ticket Price (XTZ) <span className="text-red-400">*</span>
+                                Ticket Price ({currencySymbol}) <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="number"
@@ -1192,7 +1194,7 @@ export default function CreateEventPage() {
                     {/* Max Resale Price (Optional) */}
                     <div>
                         <label htmlFor="maxResalePrice" className="block text-sm font-medium text-gray-300 mb-2">
-                            Max Resale Price (XTZ) - Optional
+                            Max Resale Price ({currencySymbol}) - Optional
                         </label>
                         <input
                             type="number"

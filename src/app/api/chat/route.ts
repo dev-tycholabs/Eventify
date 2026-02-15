@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createPublicClient, http } from "viem";
-import { etherlink } from "@/config/wagmi";
-import { CONTRACT_ADDRESSES } from "@/hooks/contracts";
+import { SUPPORTED_CHAINS, getContractsForChain } from "@/config/chains";
 
-const publicClient = createPublicClient({
-    chain: etherlink,
-    transport: http(),
-});
+// Create a public client per supported chain
+const publicClients = Object.fromEntries(
+    SUPPORTED_CHAINS.map((chain) => [
+        chain.id,
+        createPublicClient({ chain, transport: http() }),
+    ])
+);
 
 const balanceOfAbi = [
     {
@@ -51,11 +53,16 @@ const TOKEN_CACHE_TTL = 60_000;
 
 async function hasActiveListingForEvent(
     eventContractAddress: string,
-    walletAddress: string
+    walletAddress: string,
+    chainId: number
 ): Promise<boolean> {
     try {
-        const listings = await publicClient.readContract({
-            address: CONTRACT_ADDRESSES.TicketMarketplace,
+        const client = publicClients[chainId];
+        const contracts = getContractsForChain(chainId);
+        if (!client || !contracts) return false;
+
+        const listings = await client.readContract({
+            address: contracts.TicketMarketplace,
             abi: getListingsBySellerAbi,
             functionName: "getListingsBySeller",
             args: [walletAddress as `0x${string}`],
@@ -73,15 +80,19 @@ async function hasActiveListingForEvent(
 
 async function verifyTokenHolder(
     contractAddress: string,
-    walletAddress: string
+    walletAddress: string,
+    chainId: number
 ): Promise<boolean> {
-    const cacheKey = `${contractAddress.toLowerCase()}:${walletAddress.toLowerCase()}`;
+    const cacheKey = `${chainId}:${contractAddress.toLowerCase()}:${walletAddress.toLowerCase()}`;
     const cached = tokenCache.get(cacheKey);
     if (cached && Date.now() < cached.expiry) {
         return cached.isHolder;
     }
     try {
-        const balance = await publicClient.readContract({
+        const client = publicClients[chainId];
+        if (!client) return false;
+
+        const balance = await client.readContract({
             address: contractAddress as `0x${string}`,
             abi: balanceOfAbi,
             functionName: "balanceOf",
@@ -89,7 +100,7 @@ async function verifyTokenHolder(
         });
         let isHolder = balance > BigInt(0);
         if (!isHolder) {
-            isHolder = await hasActiveListingForEvent(contractAddress, walletAddress);
+            isHolder = await hasActiveListingForEvent(contractAddress, walletAddress, chainId);
         }
         tokenCache.set(cacheKey, { isHolder, expiry: Date.now() + TOKEN_CACHE_TTL });
         return isHolder;
@@ -159,7 +170,7 @@ export async function GET(request: NextRequest) {
 
         const { data: event } = await supabase
             .from("events")
-            .select("contract_address, organizer_address")
+            .select("contract_address, organizer_address, chain_id")
             .eq("id", eventId)
             .single();
 
@@ -175,7 +186,8 @@ export async function GET(request: NextRequest) {
         if (!isOrganizer) {
             const isHolder = await verifyTokenHolder(
                 event.contract_address,
-                userAddress
+                userAddress,
+                event.chain_id
             );
             if (!isHolder) {
                 return NextResponse.json(
@@ -325,7 +337,7 @@ export async function POST(request: NextRequest) {
 
         const { data: event } = await supabase
             .from("events")
-            .select("contract_address, organizer_address")
+            .select("contract_address, organizer_address, chain_id")
             .eq("id", event_id)
             .single();
 
@@ -341,7 +353,8 @@ export async function POST(request: NextRequest) {
         if (!isOrganizer) {
             const isHolder = await verifyTokenHolder(
                 event.contract_address,
-                user_address
+                user_address,
+                event.chain_id
             );
             if (!isHolder) {
                 return NextResponse.json(

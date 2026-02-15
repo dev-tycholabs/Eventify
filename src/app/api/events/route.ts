@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         const organizer = searchParams.get("organizer");
         const status = searchParams.get("status") as EventStatus | null;
         const contractAddress = searchParams.get("contract_address");
+        const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
         const limit = parseInt(searchParams.get("limit") || "50");
         const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -75,6 +76,10 @@ export async function GET(request: NextRequest) {
 
         if (contractAddress) {
             query = query.eq("contract_address", contractAddress.toLowerCase());
+        }
+
+        if (chainId) {
+            query = query.eq("chain_id", chainId);
         }
 
         if (cityFilter) {
@@ -242,6 +247,7 @@ export async function POST(request: NextRequest) {
             signature,
             message,
             event_id, // If provided, update existing event
+            chain_id,
             contract_address,
             name,
             symbol,
@@ -267,9 +273,9 @@ export async function POST(request: NextRequest) {
         } = body;
 
         // Validate required fields
-        if (!address || !signature || !message || !name) {
+        if (!address || !signature || !message || !name || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields" },
+                { error: "Missing required fields (address, signature, message, name, chain_id)" },
                 { status: 400 }
             );
         }
@@ -293,6 +299,7 @@ export async function POST(request: NextRequest) {
         // Update existing event
         if (event_id) {
             const updateData: UpdateTables<"events"> = {
+                chain_id: chain_id as number,
                 contract_address: contract_address?.toLowerCase() as string | null,
                 name: name as string,
                 symbol: symbol as string | null,
@@ -365,6 +372,7 @@ export async function POST(request: NextRequest) {
 
         // Create new event
         const insertData: InsertTables<"events"> = {
+            chain_id: chain_id as number,
             contract_address: contract_address?.toLowerCase() as string | null,
             organizer_address: (address as string).toLowerCase(),
             name: name as string,

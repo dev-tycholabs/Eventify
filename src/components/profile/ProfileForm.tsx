@@ -5,6 +5,7 @@ import { useAccount } from "wagmi";
 import { useSupabase } from "@/hooks/useSupabase";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { QRCodeModal } from "./QRCodeModal";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import { notify } from "@/utils/toast";
 
 interface ProfileData {
@@ -17,6 +18,7 @@ interface ProfileData {
 export function ProfileForm() {
     const { address, isConnected } = useAccount();
     const { getUser, saveUser, isLoading } = useSupabase();
+    const { currencySymbol } = useChainConfig();
     const { claimFunds, getClaimableBalance, isLoading: isClaimLoading } = useMarketplace();
 
     const [formData, setFormData] = useState<ProfileData>({
@@ -221,7 +223,7 @@ export function ProfileForm() {
                             <div className="animate-pulse bg-white/10 h-8 w-24 rounded" />
                         ) : (
                             <p className="text-2xl font-bold text-green-400">
-                                {(Number(claimableBalance) / 1e18).toFixed(4)} XTZ
+                                {(Number(claimableBalance) / 1e18).toFixed(4)} {currencySymbol}
                             </p>
                         )}
                     </div>

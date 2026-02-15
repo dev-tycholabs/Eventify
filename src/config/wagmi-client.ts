@@ -2,7 +2,8 @@
 
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { cookieStorage, createStorage } from "wagmi";
-import { etherlink } from "./wagmi";
+import { SUPPORTED_CHAINS } from "./chains";
+import type { Chain } from "viem";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -13,7 +14,7 @@ if (!projectId) {
 export const config = getDefaultConfig({
     appName: "Decentralized Event Ticketing",
     projectId,
-    chains: [etherlink],
+    chains: SUPPORTED_CHAINS as unknown as readonly [Chain, ...Chain[]],
     ssr: true,
     storage: createStorage({
         storage: cookieStorage,

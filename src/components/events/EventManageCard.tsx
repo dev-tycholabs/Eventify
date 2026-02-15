@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatEther } from "viem";
 import type { OrganizerEventFromDB } from "@/hooks/useOrganizerEventsFromDB";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface EventManageCardProps {
     event: OrganizerEventFromDB;
@@ -11,6 +12,7 @@ interface EventManageCardProps {
 }
 
 export function EventManageCard({ event, onManage, onWithdraw }: EventManageCardProps) {
+    const { explorerUrl, currencySymbol } = useChainConfig();
     const isPast = event.date < new Date();
     const soldPercentage = (event.soldCount / event.maxSupply) * 100;
     const hasBalance = event.contractBalance > BigInt(0);
@@ -70,12 +72,12 @@ export function EventManageCard({ event, onManage, onWithdraw }: EventManageCard
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-900/50 rounded-lg p-3">
                         <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Ticket Price</p>
-                        <p className="text-white font-semibold">{formatEther(event.ticketPrice)} XTZ</p>
+                        <p className="text-white font-semibold">{formatEther(event.ticketPrice)} {currencySymbol}</p>
                     </div>
                     <div className="bg-slate-900/50 rounded-lg p-3">
                         <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Available</p>
                         <p className={`font-semibold ${hasBalance ? "text-green-400" : "text-gray-400"}`}>
-                            {formatEther(event.contractBalance)} XTZ
+                            {formatEther(event.contractBalance)} {currencySymbol}
                         </p>
                     </div>
                 </div>
@@ -104,7 +106,7 @@ export function EventManageCard({ event, onManage, onWithdraw }: EventManageCard
             {/* Contract Address */}
             <div className="px-5 py-3 bg-slate-900/30 border-t border-white/5">
                 <a
-                    href={`https://shadownet.explorer.etherlink.com/address/${event.contractAddress}`}
+                    href={`${explorerUrl}/address/${event.contractAddress}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-gray-500 hover:text-purple-400 font-mono transition-colors"

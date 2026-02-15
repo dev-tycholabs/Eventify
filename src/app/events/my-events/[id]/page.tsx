@@ -11,6 +11,7 @@ import { txToast } from "@/utils/toast";
 import { EventTicketScanner } from "@/components/events/EventTicketScanner";
 import { RoyaltySplitterPanel } from "@/components/events/RoyaltySplitterPanel";
 import { EventAttendeesPanel } from "@/components/events/EventAttendeesPanel";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface RoyaltyRecipientData {
     id: string;
@@ -71,6 +72,7 @@ export default function EventManagePage() {
     const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
     const { writeContractAsync } = useWriteContract();
+    const { explorerUrl, currencySymbol } = useChainConfig();
 
     const [eventData, setEventData] = useState<EventData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -410,7 +412,7 @@ export default function EventManagePage() {
                                     : "bg-slate-700/50 text-gray-500 cursor-not-allowed"
                                     }`}
                             >
-                                Withdraw {formatEther(eventData.contractBalance)} XTZ
+                                Withdraw {formatEther(eventData.contractBalance)} {currencySymbol}
                             </button>
                         </div>
                     </div>
@@ -493,7 +495,7 @@ export default function EventManagePage() {
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Ticket Price</p>
                                     <p className="text-lg font-semibold text-white">
-                                        {formatEther(eventData.ticketPrice)} XTZ
+                                        {formatEther(eventData.ticketPrice)} {currencySymbol}
                                     </p>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
@@ -505,7 +507,7 @@ export default function EventManagePage() {
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Revenue</p>
                                     <p className="text-lg font-semibold text-green-400">
-                                        {formatEther(eventData.ticketPrice * BigInt(eventData.soldCount))} XTZ
+                                        {formatEther(eventData.ticketPrice * BigInt(eventData.soldCount))} {currencySymbol}
                                     </p>
                                 </div>
                             </div>
@@ -563,15 +565,15 @@ export default function EventManagePage() {
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Resale Volume</p>
-                                                    <p className="text-lg font-semibold text-green-400">{formatEther(eventData.resaleStats.totalResaleVolume)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-green-400">{formatEther(eventData.resaleStats.totalResaleVolume)} {currencySymbol}</p>
                                                 </div>
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Avg Resale Price</p>
-                                                    <p className="text-lg font-semibold text-purple-400">{formatEther(eventData.resaleStats.avgResalePrice)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-purple-400">{formatEther(eventData.resaleStats.avgResalePrice)} {currencySymbol}</p>
                                                 </div>
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Highest Sale</p>
-                                                    <p className="text-lg font-semibold text-pink-400">{formatEther(eventData.resaleStats.highestResalePrice)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-pink-400">{formatEther(eventData.resaleStats.highestResalePrice)} {currencySymbol}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -594,7 +596,7 @@ export default function EventManagePage() {
                                                             </span>
                                                         </div>
                                                         <div className="text-right flex-shrink-0">
-                                                            <p className="text-sm font-medium text-white">{formatEther(BigInt(listing.price || "0"))} XTZ</p>
+                                                            <p className="text-sm font-medium text-white">{formatEther(BigInt(listing.price || "0"))} {currencySymbol}</p>
                                                             <p className="text-xs text-gray-500">
                                                                 {new Date(listing.listed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                                             </p>
@@ -614,7 +616,7 @@ export default function EventManagePage() {
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Address</span>
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/address/${eventData.contractAddress}`}
+                                            href={`${explorerUrl}/address/${eventData.contractAddress}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sm text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
@@ -628,7 +630,7 @@ export default function EventManagePage() {
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Balance</span>
                                         <span className={`text-sm font-medium ${hasBalance ? "text-green-400" : "text-gray-400"}`}>
-                                            {formatEther(eventData.contractBalance)} XTZ
+                                            {formatEther(eventData.contractBalance)} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>

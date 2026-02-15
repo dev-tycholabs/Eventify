@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
 import {
-    CONTRACT_ADDRESSES,
     RoyaltySplitterABI,
     TicketMarketplaceABI,
 } from "@/hooks/contracts";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import { txToast } from "@/utils/toast";
 
 const NATIVE_CURRENCY = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as const;
@@ -53,6 +53,7 @@ function DirectClaimPanel({
     const { address } = useAccount();
     const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { contracts, explorerUrl, currencySymbol } = useChainConfig();
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [isClaiming, setIsClaiming] = useState(false);
@@ -72,7 +73,7 @@ function DirectClaimPanel({
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "claimableFunds",
                     args: [organizerAddr, NATIVE_CURRENCY],
@@ -86,7 +87,7 @@ function DirectClaimPanel({
         } finally {
             setIsLoadingChain(false);
         }
-    }, [publicClient, organizerAddr]);
+    }, [publicClient, organizerAddr, contracts]);
 
     // Fetch distribution history and total claimed from Supabase
     const fetchDistributions = useCallback(async () => {
@@ -125,7 +126,7 @@ function DirectClaimPanel({
 
             txToast.pending("Claiming royalties from marketplace...");
             const hash = await writeContractAsync({
-                address: CONTRACT_ADDRESSES.TicketMarketplace,
+                address: contracts!.TicketMarketplace,
                 abi: TicketMarketplaceABI,
                 functionName: "claimFunds",
                 args: [NATIVE_CURRENCY],
@@ -184,7 +185,7 @@ function DirectClaimPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(marketplaceClaimable)} XTZ`
+                            `${formatEther(marketplaceClaimable)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
@@ -194,14 +195,14 @@ function DirectClaimPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(totalEarned)} XTZ`
+                            `${formatEther(totalEarned)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Claimed</p>
                     <p className="text-lg font-semibold text-cyan-400">
-                        {formatEther(totalClaimed)} XTZ
+                        {formatEther(totalClaimed)} {currencySymbol}
                     </p>
                 </div>
             </div>
@@ -223,12 +224,12 @@ function DirectClaimPanel({
                             {isLoadingChain ? (
                                 <span className="inline-block w-16 h-4 bg-slate-700/50 rounded animate-pulse" />
                             ) : (
-                                `${formatEther(totalEarned)} XTZ`
+                                `${formatEther(totalEarned)} ${currencySymbol}`
                             )}
                             <span className="text-xs text-gray-500 ml-1">earned</span>
                         </p>
                         <p className="text-xs text-cyan-400">
-                            {formatEther(totalClaimed)} XTZ
+                            {formatEther(totalClaimed)} {currencySymbol}
                             <span className="text-gray-500 ml-1">claimed</span>
                         </p>
                     </div>
@@ -288,7 +289,7 @@ function DirectClaimPanel({
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/tx/${d.tx_hash}`}
+                                            href={`${explorerUrl}/tx/${d.tx_hash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-purple-400 hover:text-purple-300 font-mono"
@@ -296,7 +297,7 @@ function DirectClaimPanel({
                                             {d.tx_hash.slice(0, 10)}...{d.tx_hash.slice(-8)}
                                         </a>
                                         <span className="text-sm font-semibold text-green-400">
-                                            {formatEther(BigInt(d.total_distributed))} XTZ
+                                            {formatEther(BigInt(d.total_distributed))} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>
@@ -336,6 +337,7 @@ export function RoyaltySplitterPanel({
     const { address } = useAccount();
     const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { contracts, explorerUrl, currencySymbol } = useChainConfig();
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [splitterBalance, setSplitterBalance] = useState<bigint>(BigInt(0));
@@ -360,7 +362,7 @@ export function RoyaltySplitterPanel({
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: [
                         {
                             inputs: [
@@ -461,7 +463,7 @@ export function RoyaltySplitterPanel({
                 address: splitterAddr,
                 abi: RoyaltySplitterABI,
                 functionName: "claimAndDistribute",
-                args: [CONTRACT_ADDRESSES.TicketMarketplace, NATIVE_CURRENCY],
+                args: [contracts!.TicketMarketplace, NATIVE_CURRENCY],
             });
 
             // Sync on-chain state to Supabase (waits for tx confirmation internally)
@@ -543,7 +545,7 @@ export function RoyaltySplitterPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(marketplaceClaimable)} XTZ`
+                            `${formatEther(marketplaceClaimable)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
@@ -553,20 +555,20 @@ export function RoyaltySplitterPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(splitterBalance)} XTZ`
+                            `${formatEther(splitterBalance)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Earned</p>
                     <p className="text-lg font-semibold text-green-400">
-                        {formatEther(totalRoyaltyEarned)} XTZ
+                        {formatEther(totalRoyaltyEarned)} {currencySymbol}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Claimed</p>
                     <p className="text-lg font-semibold text-cyan-400">
-                        {formatEther(totalRoyaltyClaimed)} XTZ
+                        {formatEther(totalRoyaltyClaimed)} {currencySymbol}
                     </p>
                 </div>
             </div>
@@ -594,11 +596,11 @@ export function RoyaltySplitterPanel({
                             </div>
                             <div className="text-right flex-shrink-0">
                                 <p className="text-sm font-semibold text-green-400">
-                                    {formatEther(BigInt(r.royalty_earned || "0"))} XTZ
+                                    {formatEther(BigInt(r.royalty_earned || "0"))} {currencySymbol}
                                     <span className="text-xs text-gray-500 ml-1">earned</span>
                                 </p>
                                 <p className="text-xs text-cyan-400">
-                                    {formatEther(BigInt(r.royalty_claimed || "0"))} XTZ
+                                    {formatEther(BigInt(r.royalty_claimed || "0"))} {currencySymbol}
                                     <span className="text-gray-500 ml-1">claimed</span>
                                 </p>
                             </div>
@@ -613,7 +615,7 @@ export function RoyaltySplitterPanel({
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-500">Splitter Contract</span>
                         <a
-                            href={`https://shadownet.explorer.etherlink.com/address/${splitterAddr}`}
+                            href={`${explorerUrl}/address/${splitterAddr}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
@@ -702,7 +704,7 @@ export function RoyaltySplitterPanel({
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/tx/${d.tx_hash}`}
+                                            href={`${explorerUrl}/tx/${d.tx_hash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-purple-400 hover:text-purple-300 font-mono"
@@ -710,7 +712,7 @@ export function RoyaltySplitterPanel({
                                             {d.tx_hash.slice(0, 10)}...{d.tx_hash.slice(-8)}
                                         </a>
                                         <span className="text-sm font-semibold text-green-400">
-                                            {formatEther(BigInt(d.total_distributed))} XTZ
+                                            {formatEther(BigInt(d.total_distributed))} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>

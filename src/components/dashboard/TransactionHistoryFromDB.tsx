@@ -2,9 +2,8 @@
 
 import { formatEther } from "viem";
 import { useTransactionsFromDB, type TransactionFromDB } from "@/hooks/useTransactionsFromDB";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import type { TransactionType } from "@/lib/supabase/types";
-
-const EXPLORER_URL = "https://shadownet.explorer.etherlink.com";
 
 interface TransactionHistoryFromDBProps {
     address: `0x${string}`;
@@ -12,6 +11,7 @@ interface TransactionHistoryFromDBProps {
 
 export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBProps) {
     const { transactions, isLoading } = useTransactionsFromDB({ user: address });
+    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
 
     const getTypeIcon = (type: TransactionType) => {
         switch (type) {
@@ -164,7 +164,7 @@ export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBPr
                             {tx.amount && tx.txType !== "listing" && tx.txType !== "cancel" && (
                                 <span className={`font-semibold ${tx.txType === "purchase" ? "text-red-400" : "text-green-400"
                                     }`}>
-                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} XTZ
+                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} {currencySymbol}
                                 </span>
                             )}
 

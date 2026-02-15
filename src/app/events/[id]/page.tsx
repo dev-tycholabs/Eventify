@@ -11,6 +11,7 @@ import type { Tables } from "@/lib/supabase/types";
 import { txToast } from "@/utils/toast";
 import CommentSection from "@/components/events/CommentSection";
 import ChatRoom from "@/components/events/ChatRoom";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 type TransactionStatus = "idle" | "pending" | "success" | "error";
 type DBEvent = Tables<"events">;
@@ -22,6 +23,7 @@ export default function EventDetailsPage() {
     const { isConnected, address } = useAccount();
     const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { explorerUrl, currencySymbol } = useChainConfig();
 
     const [dbEvent, setDbEvent] = useState<DBEvent | null>(null);
     const [royaltyRecipients, setRoyaltyRecipients] = useState<RoyaltyRecipient[]>([]);
@@ -594,7 +596,7 @@ export default function EventDetailsPage() {
                         {dbEvent.max_resale_price && (
                             <div>
                                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Max Resale Price</p>
-                                <p className="text-white font-medium">{dbEvent.max_resale_price} XTZ</p>
+                                <p className="text-white font-medium">{dbEvent.max_resale_price} {currencySymbol}</p>
                             </div>
                         )}
                         <div>
@@ -658,7 +660,7 @@ export default function EventDetailsPage() {
                         <div>
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Price per ticket</p>
                             <p className="text-2xl font-bold text-white">
-                                {dbEvent.ticket_price || "0"} XTZ
+                                {dbEvent.ticket_price || "0"} {currencySymbol}
                             </p>
                         </div>
                         <div className="text-right">
@@ -708,7 +710,7 @@ export default function EventDetailsPage() {
                         <div className="flex items-center justify-between mb-6 p-4 bg-slate-900/50 rounded-lg">
                             <span className="text-gray-400">Total</span>
                             <span className="text-xl font-bold text-white">
-                                {formatEther(totalPrice)} XTZ
+                                {formatEther(totalPrice)} {currencySymbol}
                             </span>
                         </div>
                     )}
@@ -802,7 +804,7 @@ export default function EventDetailsPage() {
                         <p className="text-xs text-gray-500">
                             Contract:{" "}
                             <a
-                                href={`https://shadownet.explorer.etherlink.com/address/${contractAddress}`}
+                                href={`${explorerUrl}/address/${contractAddress}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-purple-400 hover:text-purple-300 font-mono"

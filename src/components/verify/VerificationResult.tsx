@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { EventTicketABI } from "@/hooks/contracts";
 import type { VerificationData } from "@/app/verify/page";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface VerificationResultProps {
     result: VerificationData;
@@ -13,6 +14,7 @@ interface VerificationResultProps {
 export function VerificationResult({ result, onReset }: VerificationResultProps) {
     const { isValid, holder, isUsed, eventName, eventVenue, eventDate, tokenId, eventAddress } = result;
     const { address, isConnected } = useAccount();
+    const { explorerUrl } = useChainConfig();
     const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
 
@@ -291,7 +293,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                         <div className="flex items-start justify-between gap-4 py-3">
                             <span className="text-gray-400 text-sm">Contract</span>
                             <a
-                                href={`https://shadownet.explorer.etherlink.com/address/${eventAddress}`}
+                                href={`${explorerUrl}/address/${eventAddress}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-purple-400 hover:text-purple-300 font-mono text-sm flex items-center gap-1 transition-colors"

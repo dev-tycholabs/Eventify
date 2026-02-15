@@ -13,7 +13,8 @@
     "test": "hardhat test",
     "deploy:local": "hardhat run scripts/deploy-ticketing.js --network hardhat",
     "deploy:etherlink-testnet": "hardhat run scripts/deploy-ticketing.js --network etherlinkTestnet",
-    "deploy:etherlink": "hardhat run scripts/deploy-ticketing.js --network etherlink"
+    "deploy:etherlink": "hardhat run scripts/deploy-ticketing.js --network etherlink",
+    "deploy:sepolia": "hardhat run scripts/deploy-ticketing.js --network sepolia"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3"

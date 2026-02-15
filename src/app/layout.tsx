@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Eventify",
-  description: "Blockchain-based event ticketing platform on Etherlink",
+  description: "Blockchain-based event ticketing platform",
 };
 
 export default async function RootLayout({

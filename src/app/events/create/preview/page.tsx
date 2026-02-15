@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import CommentSection from "@/components/events/CommentSection";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface MediaFile {
     url: string;
@@ -46,6 +47,7 @@ export default function EventPreviewPage() {
     const [royaltyRecipients, setRoyaltyRecipients] = useState<RoyaltyRecipient[]>([]);
     const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { currencySymbol } = useChainConfig();
 
     // Gallery carousel state
     const [carouselOpen, setCarouselOpen] = useState(false);
@@ -490,7 +492,7 @@ export default function EventPreviewPage() {
                         {event.max_resale_price && (
                             <div>
                                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Max Resale Price</p>
-                                <p className="text-white font-medium">{event.max_resale_price} XTZ</p>
+                                <p className="text-white font-medium">{event.max_resale_price} {currencySymbol}</p>
                             </div>
                         )}
                         <div>
@@ -552,7 +554,7 @@ export default function EventPreviewPage() {
                     <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/10">
                         <div>
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Price per ticket</p>
-                            <p className="text-2xl font-bold text-white">{event.ticket_price || "0"} XTZ</p>
+                            <p className="text-2xl font-bold text-white">{event.ticket_price || "0"} {currencySymbol}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Available</p>
@@ -579,7 +581,7 @@ export default function EventPreviewPage() {
 
                     <div className="flex items-center justify-between mb-6 p-4 bg-slate-900/50 rounded-lg">
                         <span className="text-gray-400">Total</span>
-                        <span className="text-xl font-bold text-white">{event.ticket_price || "0"} XTZ</span>
+                        <span className="text-xl font-bold text-white">{event.ticket_price || "0"} {currencySymbol}</span>
                     </div>
 
                     <button disabled className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg opacity-50 cursor-not-allowed">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { formatEther } from "viem";
 import type { OrganizerEventFromDB } from "@/hooks/useOrganizerEventsFromDB";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface EventManageModalProps {
     isOpen: boolean;
@@ -16,6 +17,7 @@ export function EventManageModal({ isOpen, onClose, event, onUpdateURI, onRefres
     const [activeTab, setActiveTab] = useState<"details" | "settings">("details");
     const [newBaseURI, setNewBaseURI] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
+    const { explorerUrl, currencySymbol } = useChainConfig();
 
     useEffect(() => {
         // Reset the URI input when modal opens
@@ -142,12 +144,12 @@ export function EventManageModal({ isOpen, onClose, event, onUpdateURI, onRefres
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Ticket Price</p>
-                                    <p className="text-2xl font-bold text-white">{formatEther(event.ticketPrice)} XTZ</p>
+                                    <p className="text-2xl font-bold text-white">{formatEther(event.ticketPrice)} {currencySymbol}</p>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Revenue</p>
                                     <p className="text-2xl font-bold text-green-400">
-                                        {formatEther(event.ticketPrice * BigInt(event.soldCount))} XTZ
+                                        {formatEther(event.ticketPrice * BigInt(event.soldCount))} {currencySymbol}
                                     </p>
                                 </div>
                             </div>
@@ -159,7 +161,7 @@ export function EventManageModal({ isOpen, onClose, event, onUpdateURI, onRefres
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Address</span>
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/address/${event.contractAddress}`}
+                                            href={`${explorerUrl}/address/${event.contractAddress}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sm text-purple-400 hover:text-purple-300 font-mono"
@@ -170,7 +172,7 @@ export function EventManageModal({ isOpen, onClose, event, onUpdateURI, onRefres
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Balance</span>
                                         <span className="text-sm text-white font-medium">
-                                            {formatEther(event.contractBalance)} XTZ
+                                            {formatEther(event.contractBalance)} {currencySymbol}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">

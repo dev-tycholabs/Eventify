@@ -6,6 +6,7 @@ import { downloadTicketAsPNG, downloadTicketAsPDF } from "@/utils/ticketDownload
 import toast from "react-hot-toast";
 import QRCode from "qrcode";
 import { TicketHistoryModal } from "./TicketHistoryModal";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface UserTicket {
     tokenId: bigint;
@@ -35,6 +36,7 @@ export function TicketDetailModal({
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
     const [showHistory, setShowHistory] = useState(false);
     const ticketRef = useRef<HTMLDivElement>(null);
+    const { currencySymbol } = useChainConfig();
 
     // Generate real QR code using the qrcode library - contains URL to verify page
     useEffect(() => {
@@ -214,7 +216,7 @@ export function TicketDetailModal({
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase tracking-wide">Original Price</p>
-                                    <p className="text-white font-medium">{formatEther(ticket.ticketPrice)} XTZ</p>
+                                    <p className="text-white font-medium">{formatEther(ticket.ticketPrice)} {currencySymbol}</p>
                                 </div>
                             </div>
                         </div>

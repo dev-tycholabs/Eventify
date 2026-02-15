@@ -44,6 +44,13 @@ module.exports = {
       chainId: 127823,
       timeout: 60000,
     },
+    // Ethereum Sepolia Testnet
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 11155111,
+      timeout: 60000,
+    },
     // Etherlink Mainnet
     etherlink: {
       url: "https://node.mainnet.etherlink.com",

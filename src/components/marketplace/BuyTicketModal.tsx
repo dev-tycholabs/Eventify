@@ -2,6 +2,7 @@
 
 import { formatEther } from "viem";
 import type { MarketplaceListing } from "@/types/ticket";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface BuyTicketModalProps {
     isOpen: boolean;
@@ -24,6 +25,7 @@ export function BuyTicketModal({
     venue,
     isLoading = false,
 }: BuyTicketModalProps) {
+    const { currencySymbol } = useChainConfig();
     if (!isOpen || !listing) return null;
 
     const formattedDate = eventDate?.toLocaleDateString("en-US", {
@@ -112,14 +114,14 @@ export function BuyTicketModal({
                     <div className="flex items-center justify-between">
                         <span className="text-gray-400">Total Price</span>
                         <span className="text-2xl font-bold text-white">
-                            {formatEther(listing.price)} XTZ
+                            {formatEther(listing.price)} {currencySymbol}
                         </span>
                     </div>
                 </div>
 
                 {/* Info */}
                 <div className="mb-6 text-xs text-gray-500">
-                    <p>By confirming, you will send {formatEther(listing.price)} XTZ to purchase this ticket. The NFT will be transferred to your wallet upon successful transaction.</p>
+                    <p>By confirming, you will send {formatEther(listing.price)} {currencySymbol} to purchase this ticket. The NFT will be transferred to your wallet upon successful transaction.</p>
                 </div>
 
                 {/* Actions */}

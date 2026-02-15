@@ -14,8 +14,7 @@ import { QRCodeModal } from "@/components/profile";
 import { downloadTicketAsPNG, downloadTicketAsPDF } from "@/utils/ticketDownload";
 import toast from "react-hot-toast";
 import type { TransactionType } from "@/lib/supabase/types";
-
-const EXPLORER_URL = "https://shadownet.explorer.etherlink.com";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface TicketData {
     id: string;
@@ -51,6 +50,7 @@ export default function TicketDetailPage() {
     const eventId = params.eventId as string;
     const tokenId = params.tokenId as string;
     const { address } = useAccount();
+    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
 
     const [ticket, setTicket] = useState<TicketData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -587,7 +587,7 @@ export default function TicketDetailPage() {
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide">Purchase Price</p>
-                                                    <p className="text-white font-medium">{formatEther(BigInt(ticket.purchase_price))} XTZ</p>
+                                                    <p className="text-white font-medium">{formatEther(BigInt(ticket.purchase_price))} {currencySymbol}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -713,7 +713,7 @@ export default function TicketDetailPage() {
                                                                     <span className="text-xs text-gray-500">{entry.txTimestamp.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                                                                 </div>
                                                                 <p className="text-gray-300 text-sm mb-1">By {formatAddress(entry.userAddress)}</p>
-                                                                {entry.amount && <p className="text-gray-400 text-sm">Price: <span className="text-white font-medium">{formatEther(entry.amount)} XTZ</span></p>}
+                                                                {entry.amount && <p className="text-gray-400 text-sm">Price: <span className="text-white font-medium">{formatEther(entry.amount)} {currencySymbol}</span></p>}
                                                                 {entry.txHash && !entry.txHash.startsWith("list-") && !entry.txHash.startsWith("buy-") && !entry.txHash.startsWith("cancel-") && (
                                                                     <a href={`${EXPLORER_URL}/tx/${entry.txHash}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 mt-2">
                                                                         View tx <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>

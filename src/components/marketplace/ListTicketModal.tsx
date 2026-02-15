@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatEther, parseEther } from "viem";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface ListTicketModalProps {
     isOpen: boolean;
@@ -27,6 +28,7 @@ export function ListTicketModal({
     const [priceInput, setPriceInput] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [showPriceCapWarning, setShowPriceCapWarning] = useState(false);
+    const { currencySymbol } = useChainConfig();
 
     // Reset state when modal opens
     useEffect(() => {
@@ -65,7 +67,7 @@ export function ListTicketModal({
             const priceWei = parseEther(priceInput);
 
             if (maxResalePrice && priceWei > maxResalePrice) {
-                setError(`Price exceeds maximum allowed (${formatEther(maxResalePrice)} XTZ)`);
+                setError(`Price exceeds maximum allowed (${formatEther(maxResalePrice)} {currencySymbol})`);
                 return;
             }
 
@@ -119,7 +121,7 @@ export function ListTicketModal({
                     {originalPrice && (
                         <div className="mt-3 pt-3 border-t border-white/10">
                             <p className="text-xs text-gray-500">Original Price</p>
-                            <p className="text-white font-medium">{formatEther(originalPrice)} XTZ</p>
+                            <p className="text-white font-medium">{formatEther(originalPrice)} {currencySymbol}</p>
                         </div>
                     )}
                 </div>
@@ -128,7 +130,7 @@ export function ListTicketModal({
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
                         <label htmlFor="price" className="block text-sm font-medium text-gray-300 mb-2">
-                            Listing Price (XTZ)
+                            Listing Price ({currencySymbol})
                         </label>
                         <div className="relative">
                             <input
@@ -143,7 +145,7 @@ export function ListTicketModal({
                                 disabled={isLoading}
                             />
                             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                XTZ
+                                {currencySymbol}
                             </span>
                         </div>
                     </div>
@@ -158,7 +160,7 @@ export function ListTicketModal({
                                 <div>
                                     <p className="text-orange-400 text-sm font-medium">Price exceeds cap</p>
                                     <p className="text-orange-400/80 text-xs mt-0.5">
-                                        Maximum allowed: {formatEther(maxResalePrice)} XTZ
+                                        Maximum allowed: {formatEther(maxResalePrice)} {currencySymbol}
                                     </p>
                                 </div>
                             </div>
