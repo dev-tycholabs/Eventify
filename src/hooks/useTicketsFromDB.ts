@@ -26,6 +26,7 @@ export interface UserTicketFromDB {
     id: string;
     tokenId: bigint;
     eventContractAddress: `0x${string}`;
+    chainId: number;
     eventId: string | null;
     ownerAddress: `0x${string}`;
     isUsed: boolean;
@@ -94,6 +95,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
                 id: t.id,
                 tokenId: BigInt(t.token_id),
                 eventContractAddress: t.event_contract_address as `0x${string}`,
+                chainId: t.chain_id,
                 eventId: t.event_id,
                 ownerAddress: t.owner_address as `0x${string}`,
                 isUsed: t.is_used,

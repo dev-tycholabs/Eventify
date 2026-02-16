@@ -32,7 +32,7 @@ export function useEventFactory() {
     const [soldCounts, setSoldCounts] = useState<Record<string, number>>({});
     const { address, isConnected } = useAccount();
     const publicClient = usePublicClient();
-    const { contracts } = useChainConfig();
+    const { contracts, chainId } = useChainConfig();
 
     const { writeContractAsync } = useWriteContract();
 
@@ -258,6 +258,7 @@ export function useEventFactory() {
         return (eventInfos as EventInfo[]).map((info) => ({
             id: info.id.toString(),
             contractAddress: info.contractAddress,
+            chainId,
             name: info.name,
             description: "",
             date: new Date(Number(info.eventDate) * 1000),
@@ -268,7 +269,7 @@ export function useEventFactory() {
             soldCount: soldCounts[info.contractAddress] ?? 0,
             organizer: info.organizer,
         }));
-    }, [eventInfos, soldCounts]);
+    }, [eventInfos, soldCounts, chainId]);
 
     // Refetch all event data
     const refetch = useCallback(async () => {

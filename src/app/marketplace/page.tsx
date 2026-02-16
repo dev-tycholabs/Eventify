@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useMarketplaceListings } from "@/hooks/useMarketplaceListings";
 import { syncListing, syncTransaction, syncTicket, findEventIdByContract } from "@/lib/api/sync";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import {
     ListingGrid,
     BuyTicketModal,
@@ -14,6 +15,8 @@ import type { MarketplaceListing } from "@/types/ticket";
 
 export default function MarketplacePage() {
     const { address, isConnected } = useAccount();
+    const { chainId } = useChainConfig();
+    const { switchChainAsync } = useSwitchChain();
 
     // Get listings from database (not blockchain)
     const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active" });
@@ -37,6 +40,17 @@ export default function MarketplacePage() {
     const handleBuyConfirm = async () => {
         if (!selectedListing || !address) return;
 
+        // Prompt wallet to switch chain if needed
+        if (selectedListing.chainId && selectedListing.chainId !== chainId) {
+            try {
+                await switchChainAsync({ chainId: selectedListing.chainId });
+            } catch {
+                return;
+            }
+            // Chain switched — wagmi re-renders. User needs to confirm again.
+            return;
+        }
+
         setProcessingListingId(selectedListing.listingId);
         const result = await buyTicket(selectedListing.listingId, selectedListing.price);
 
@@ -52,6 +66,7 @@ export default function MarketplacePage() {
                 price: selectedListing.price.toString(),
                 buyer_address: address,
                 action: "buy",
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             // Record purchase transaction for buyer
@@ -67,6 +82,7 @@ export default function MarketplacePage() {
                 from_address: selectedListing.seller,
                 to_address: address,
                 tx_timestamp: new Date().toISOString(),
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             // Record sale transaction for seller
@@ -82,6 +98,7 @@ export default function MarketplacePage() {
                 from_address: selectedListing.seller,
                 to_address: address,
                 tx_timestamp: new Date().toISOString(),
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             await syncTicket({
@@ -91,6 +108,7 @@ export default function MarketplacePage() {
                 owner_address: address,
                 is_listed: false,
                 action: "transfer",
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             setBuyModalOpen(false);
@@ -110,6 +128,16 @@ export default function MarketplacePage() {
     const handleCancelListing = async (listing: MarketplaceListing) => {
         if (!address) return;
 
+        // Prompt wallet to switch chain if needed
+        if (listing.chainId && listing.chainId !== chainId) {
+            try {
+                await switchChainAsync({ chainId: listing.chainId });
+            } catch {
+                return;
+            }
+            return;
+        }
+
         setProcessingListingId(listing.listingId);
         const result = await cancelListing(listing.listingId);
 
@@ -124,6 +152,7 @@ export default function MarketplacePage() {
                 seller_address: listing.seller,
                 price: listing.price.toString(),
                 action: "cancel",
+                chain_id: listing.chainId ?? chainId,
             });
 
             if (result.txHash) {
@@ -136,6 +165,7 @@ export default function MarketplacePage() {
                     event_id: eventId || undefined,
                     listing_id: listing.listingId.toString(),
                     tx_timestamp: new Date().toISOString(),
+                    chain_id: listing.chainId ?? chainId,
                 });
             }
 
@@ -146,6 +176,7 @@ export default function MarketplacePage() {
                 owner_address: address,
                 is_listed: false,
                 action: "unlist",
+                chain_id: listing.chainId ?? chainId,
             });
 
             await refetch();

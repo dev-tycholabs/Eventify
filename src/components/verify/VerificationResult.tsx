@@ -14,7 +14,7 @@ interface VerificationResultProps {
 export function VerificationResult({ result, onReset }: VerificationResultProps) {
     const { isValid, holder, isUsed, eventName, eventVenue, eventDate, tokenId, eventAddress } = result;
     const { address, isConnected } = useAccount();
-    const { explorerUrl } = useChainConfig();
+    const { explorerUrl, chainId } = useChainConfig();
     const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
 
@@ -71,6 +71,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                     event_contract_address: eventAddress,
                     owner_address: holder,
                     action: "use",
+                    chain_id: chainId,
                 }),
             });
 
@@ -85,6 +86,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                     token_id: tokenId.toString(),
                     event_contract_address: eventAddress,
                     tx_timestamp: new Date().toISOString(),
+                    chain_id: chainId,
                 }),
             });
         } catch (syncError) {

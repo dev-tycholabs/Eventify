@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useWriteContract, useAccount, usePublicClient } from "wagmi";
+import { useWriteContract, useAccount, usePublicClient, useSwitchChain } from "wagmi";
 import { TicketMarketplaceABI, EventTicketABI } from "./contracts";
 import { useChainConfig } from "./useChainConfig";
 import { ErrorCode, type AppError } from "@/types/errors";
@@ -16,9 +16,29 @@ export function useMarketplace() {
     const [error, setError] = useState<AppError | null>(null);
     const { address, isConnected } = useAccount();
     const publicClient = usePublicClient();
-    const { contracts, currencySymbol } = useChainConfig();
+    const { contracts, currencySymbol, chainId } = useChainConfig();
 
     const { writeContractAsync } = useWriteContract();
+    const { switchChainAsync } = useSwitchChain();
+
+    /**
+     * Prompt the wallet to switch chain if needed.
+     * Returns true if we're now on the right chain, false if user rejected.
+     * If a switch happened, returns 'switched' so callers know to bail
+     * and let wagmi re-render before retrying.
+     */
+    const ensureChain = useCallback(
+        async (targetChainId?: number): Promise<"ok" | "switched" | "rejected"> => {
+            if (!targetChainId || targetChainId === chainId) return "ok";
+            try {
+                await switchChainAsync({ chainId: targetChainId });
+                return "switched";
+            } catch {
+                return "rejected";
+            }
+        },
+        [chainId, switchChainAsync]
+    );
 
 
     // Check price cap for a listing
@@ -52,7 +72,8 @@ export function useMarketplace() {
         async (
             eventContractAddress: `0x${string}`,
             tokenId: bigint,
-            price: bigint
+            price: bigint,
+            targetChainId?: number
         ): Promise<bigint | null> => {
             if (!isConnected || !address) {
                 setError({
@@ -61,6 +82,10 @@ export function useMarketplace() {
                 });
                 return null;
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return null;
+            if (chainResult === "switched") return null; // re-render needed
 
             if (!publicClient) {
                 setError({
@@ -183,6 +208,7 @@ export function useMarketplace() {
                             price: price.toString(),
                             tx_hash: listingHash,
                             action: "list",
+                            chain_id: chainId,
                         });
                     }
 
@@ -195,6 +221,7 @@ export function useMarketplace() {
                         is_listed: true,
                         listing_id: listingId?.toString(),
                         action: "list",
+                        chain_id: chainId,
                     });
 
                     // Always sync transaction with real tx hash
@@ -208,6 +235,7 @@ export function useMarketplace() {
                         listing_id: listingId?.toString(),
                         amount: price.toString(),
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 } catch (syncErr) {
                     console.error("Failed to sync listing to database:", syncErr);
@@ -223,13 +251,13 @@ export function useMarketplace() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync, checkPriceCap, contracts]
+        [isConnected, address, publicClient, writeContractAsync, checkPriceCap, contracts, chainId, ensureChain]
     );
 
 
     // Buy a listed ticket
     const buyTicket = useCallback(
-        async (listingId: bigint, price: bigint): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
+        async (listingId: bigint, price: bigint, targetChainId?: number): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
                     code: ErrorCode.WALLET_NOT_CONNECTED,
@@ -237,6 +265,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false }; // re-render needed
 
             if (!publicClient) {
                 setError({
@@ -275,12 +307,12 @@ export function useMarketplace() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync]
+        [isConnected, address, publicClient, writeContractAsync, ensureChain]
     );
 
     // Cancel a listing
     const cancelListing = useCallback(
-        async (listingId: bigint): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
+        async (listingId: bigint, targetChainId?: number): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
                     code: ErrorCode.WALLET_NOT_CONNECTED,
@@ -288,6 +320,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false };
 
             if (!publicClient) {
                 setError({
@@ -333,7 +369,8 @@ export function useMarketplace() {
         async (
             eventContractAddress: `0x${string}`,
             tokenId: bigint,
-            toAddress: `0x${string}`
+            toAddress: `0x${string}`,
+            targetChainId?: number
         ): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
@@ -342,6 +379,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false };
 
             if (!publicClient) {
                 setError({
@@ -388,6 +429,7 @@ export function useMarketplace() {
                         event_id: eventId || undefined,
                         owner_address: toAddress,
                         action: "transfer",
+                        chain_id: chainId,
                     });
 
                     // Record transaction for sender
@@ -401,6 +443,7 @@ export function useMarketplace() {
                         from_address: address,
                         to_address: toAddress,
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 } catch (syncErr) {
                     console.error("Failed to sync transfer to database:", syncErr);

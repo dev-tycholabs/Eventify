@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTicketsFromDB } from "@/hooks/useTicketsFromDB";
 import { useMarketplace } from "@/hooks/useMarketplace";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import { syncListing, syncTicket, syncTransaction, findEventIdByContract } from "@/lib/api/sync";
 import { TicketCard } from "./TicketCard";
 import { ListTicketModal, TransferTicketModal } from "@/components/marketplace";
@@ -22,6 +23,7 @@ interface UserTicket {
     listingId?: string;
     listingPrice?: bigint;
     imageUrl?: string;
+    chainId: number;
 }
 
 interface TicketGalleryFromDBProps {
@@ -31,6 +33,7 @@ interface TicketGalleryFromDBProps {
 
 export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFromDBProps) {
     const router = useRouter();
+    const { chainId } = useChainConfig();
     const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
     const [transferTicket, setTransferTicket] = useState<UserTicket | null>(null);
     const [isListingLoading, setIsListingLoading] = useState(false);
@@ -64,6 +67,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
         listingId: t.listingId || undefined,
         listingPrice: t.listingPrice ?? undefined,
         imageUrl: t.eventImageUrl || undefined,
+        chainId: t.chainId,
     }));
 
     const handleListForSale = async (price: bigint) => {
@@ -74,7 +78,8 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
             const result = await listTicket(
                 listingTicket.eventContractAddress,
                 listingTicket.tokenId,
-                price
+                price,
+                listingTicket.chainId
             );
 
             if (result !== null) {
@@ -117,7 +122,8 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
             const result = await transferTicketOnChain(
                 transferTicket.eventContractAddress,
                 transferTicket.tokenId,
-                toAddress
+                toAddress,
+                transferTicket.chainId
             );
 
             if (result.success) {
@@ -143,7 +149,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
         setCancellingTicketId(ticketKey);
 
         try {
-            const result = await cancelListing(listingId);
+            const result = await cancelListing(listingId, ticket.chainId);
 
             if (result.success) {
                 // Sync to database
@@ -157,6 +163,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                     seller_address: address,
                     price: (ticket.listingPrice || ticket.ticketPrice).toString(),
                     action: "cancel",
+                    chain_id: chainId,
                 });
 
                 if (result.txHash) {
@@ -169,6 +176,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                         event_id: eventId || undefined,
                         listing_id: ticket.listingId,
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 }
 
@@ -179,6 +187,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                     owner_address: address,
                     is_listed: false,
                     action: "unlist",
+                    chain_id: chainId,
                 });
 
                 await refetchTickets();
@@ -271,6 +280,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                 originalPrice={listingTicket?.ticketPrice}
                 maxResalePrice={maxResalePrice}
                 isLoading={isListingLoading}
+                chainId={listingTicket?.chainId}
             />
 
             {/* Transfer Ticket Modal */}

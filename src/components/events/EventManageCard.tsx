@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { formatEther } from "viem";
 import type { OrganizerEventFromDB } from "@/hooks/useOrganizerEventsFromDB";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol, getExplorerUrl } from "@/config/chains";
 
 interface EventManageCardProps {
     event: OrganizerEventFromDB;
@@ -12,7 +12,8 @@ interface EventManageCardProps {
 }
 
 export function EventManageCard({ event, onManage, onWithdraw }: EventManageCardProps) {
-    const { explorerUrl, currencySymbol } = useChainConfig();
+    const explorerUrl = getExplorerUrl(event.chainId);
+    const currencySymbol = getNativeCurrencySymbol(event.chainId);
     const isPast = event.date < new Date();
     const soldPercentage = (event.soldCount / event.maxSupply) * 100;
     const hasBalance = event.contractBalance > BigInt(0);

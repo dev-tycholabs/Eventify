@@ -1,5 +1,7 @@
 "use client";
 
+import { SUPPORTED_CHAINS } from "@/config/chains";
+
 interface UserTicket {
     tokenId: bigint;
     eventContractAddress: `0x${string}`;
@@ -10,6 +12,7 @@ interface UserTicket {
     isListed: boolean;
     ticketPrice: bigint;
     imageUrl?: string;
+    chainId: number;
 }
 
 interface TicketCardProps {
@@ -37,6 +40,8 @@ export function TicketCard({
     });
 
     const isPastEvent = ticket.eventDate < new Date();
+
+    const chainName = SUPPORTED_CHAINS.find((c) => c.id === ticket.chainId)?.name || "Unknown Chain";
 
     const getStatusBadge = () => {
         if (ticket.isUsed) {
@@ -98,11 +103,16 @@ export function TicketCard({
                         />
                     </svg>
                 )}
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 flex flex-col gap-2">
                     {getStatusBadge()}
+                    <div className="px-2 py-1 bg-purple-600/80 text-white text-xs font-semibold rounded">
+                        {chainName}
+                    </div>
                 </div>
-                <div className="absolute top-3 right-3 px-2 py-1 bg-slate-900/80 text-white text-xs font-mono rounded">
-                    #{ticket.tokenId.toString()}
+                <div className="absolute top-3 right-3">
+                    <div className="px-2 py-1 bg-slate-900/80 text-white text-xs font-mono rounded">
+                        #{ticket.tokenId.toString()}
+                    </div>
                 </div>
                 {/* View Details overlay on hover */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

@@ -18,6 +18,7 @@ export interface TransactionFromDB {
     id: string;
     txHash: string;
     txType: TransactionType;
+    chainId: number;
     userAddress: `0x${string}`;
     tokenId: string | null;
     eventContractAddress: `0x${string}` | null;
@@ -83,6 +84,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
                 id: t.id,
                 txHash: t.tx_hash,
                 txType: t.tx_type,
+                chainId: t.chain_id,
                 userAddress: t.user_address as `0x${string}`,
                 tokenId: t.token_id,
                 eventContractAddress: t.event_contract_address as `0x${string}` | null,

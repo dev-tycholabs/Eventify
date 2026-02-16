@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { formatEther } from "viem";
 import type { OrganizerEventFromDB } from "@/hooks/useOrganizerEventsFromDB";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol, getExplorerUrl } from "@/config/chains";
 
 interface EventManageModalProps {
     isOpen: boolean;
@@ -17,7 +17,8 @@ export function EventManageModal({ isOpen, onClose, event, onUpdateURI, onRefres
     const [activeTab, setActiveTab] = useState<"details" | "settings">("details");
     const [newBaseURI, setNewBaseURI] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
-    const { explorerUrl, currencySymbol } = useChainConfig();
+    const explorerUrl = event ? getExplorerUrl(event.chainId) : "";
+    const currencySymbol = event ? getNativeCurrencySymbol(event.chainId) : "ETH";
 
     useEffect(() => {
         // Reset the URI input when modal opens

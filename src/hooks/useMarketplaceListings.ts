@@ -18,6 +18,7 @@ interface DBListing {
     token_id: string;
     event_contract_address: string;
     event_id: string | null;
+    chain_id: number;
     seller_address: string;
     price: string;
     status: "active" | "sold" | "cancelled";
@@ -64,6 +65,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
                 listingId: BigInt(l.listing_id),
                 tokenId: BigInt(l.token_id),
                 eventContractAddress: l.event_contract_address as `0x${string}`,
+                chainId: l.chain_id,
                 seller: l.seller_address as `0x${string}`,
                 price: BigInt(l.price),
                 isActive: l.status === "active",

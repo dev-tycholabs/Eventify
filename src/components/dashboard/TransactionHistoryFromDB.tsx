@@ -2,7 +2,7 @@
 
 import { formatEther } from "viem";
 import { useTransactionsFromDB, type TransactionFromDB } from "@/hooks/useTransactionsFromDB";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol, getExplorerUrl } from "@/config/chains";
 import type { TransactionType } from "@/lib/supabase/types";
 
 interface TransactionHistoryFromDBProps {
@@ -11,7 +11,6 @@ interface TransactionHistoryFromDBProps {
 
 export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBProps) {
     const { transactions, isLoading } = useTransactionsFromDB({ user: address });
-    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
 
     const getTypeIcon = (type: TransactionType) => {
         switch (type) {
@@ -164,13 +163,13 @@ export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBPr
                             {tx.amount && tx.txType !== "listing" && tx.txType !== "cancel" && (
                                 <span className={`font-semibold ${tx.txType === "purchase" ? "text-red-400" : "text-green-400"
                                     }`}>
-                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} {currencySymbol}
+                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} {getNativeCurrencySymbol(tx.chainId)}
                                 </span>
                             )}
 
                             {tx.txHash && !tx.txHash.startsWith("list-") && !tx.txHash.startsWith("buy-") && !tx.txHash.startsWith("cancel-") && (
                                 <a
-                                    href={`${EXPLORER_URL}/tx/${tx.txHash}`}
+                                    href={`${getExplorerUrl(tx.chainId)}/tx/${tx.txHash}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-2 text-gray-400 hover:text-white transition-colors"

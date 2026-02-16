@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { formatEther } from "viem";
 import type { Event } from "@/types/event";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol, SUPPORTED_CHAINS } from "@/config/chains";
 
 interface EventCardProps {
     event: Event;
@@ -11,7 +11,8 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, showDistance }: EventCardProps) {
-    const { currencySymbol } = useChainConfig();
+    const currencySymbol = getNativeCurrencySymbol(event.chainId);
+    const chainName = SUPPORTED_CHAINS.find(c => c.id === event.chainId)?.name;
     const formattedDate = event.date.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -76,6 +77,12 @@ export function EventCard({ event, showDistance }: EventCardProps) {
                             {event.distance_km < 1
                                 ? "< 1 km"
                                 : `${Math.round(event.distance_km)} km`}
+                        </div>
+                    )}
+                    {/* Chain Badge */}
+                    {chainName && (
+                        <div className={`absolute ${showDistance && event.distance_km != null ? 'bottom-3' : 'top-3'} left-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded-full`}>
+                            {chainName}
                         </div>
                     )}
                 </div>

@@ -9,6 +9,7 @@ type Event = Tables<"events">;
 export interface OrganizerEventFromDB {
     id: string;
     contractAddress: `0x${string}`;
+    chainId: number;
     name: string;
     venue: string;
     date: Date;
@@ -74,6 +75,7 @@ export function useOrganizerEventsFromDB() {
                         return {
                             id: event.id,
                             contractAddress,
+                            chainId: event.chain_id,
                             name: event.name,
                             venue: event.venue || "",
                             date: event.date ? new Date(event.date) : new Date(),

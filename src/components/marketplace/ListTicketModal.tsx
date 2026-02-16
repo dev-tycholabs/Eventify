@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatEther, parseEther } from "viem";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol } from "@/config/chains";
 
 interface ListTicketModalProps {
     isOpen: boolean;
@@ -13,6 +13,7 @@ interface ListTicketModalProps {
     originalPrice?: bigint;
     maxResalePrice?: bigint;
     isLoading?: boolean;
+    chainId?: number;
 }
 
 export function ListTicketModal({
@@ -24,11 +25,12 @@ export function ListTicketModal({
     originalPrice,
     maxResalePrice,
     isLoading = false,
+    chainId,
 }: ListTicketModalProps) {
     const [priceInput, setPriceInput] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [showPriceCapWarning, setShowPriceCapWarning] = useState(false);
-    const { currencySymbol } = useChainConfig();
+    const currencySymbol = chainId ? getNativeCurrencySymbol(chainId) : "ETH";
 
     // Reset state when modal opens
     useEffect(() => {

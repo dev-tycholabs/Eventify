@@ -50,7 +50,7 @@ export default function TicketDetailPage() {
     const eventId = params.eventId as string;
     const tokenId = params.tokenId as string;
     const { address } = useAccount();
-    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
+    const { explorerUrl: EXPLORER_URL, currencySymbol, chainId } = useChainConfig();
 
     const [ticket, setTicket] = useState<TicketData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -238,6 +238,7 @@ export default function TicketDetailPage() {
                     seller_address: address,
                     price: ticket.marketplace_listing?.price || ticket.purchase_price || "0",
                     action: "cancel",
+                    chain_id: chainId,
                 });
                 if (result.txHash) {
                     await syncTransaction({
@@ -249,6 +250,7 @@ export default function TicketDetailPage() {
                         event_id: eventId || undefined,
                         listing_id: ticket.listing_id,
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 }
                 await syncTicket({
@@ -258,6 +260,7 @@ export default function TicketDetailPage() {
                     owner_address: address,
                     is_listed: false,
                     action: "unlist",
+                    chain_id: chainId,
                 });
                 await refetchTicket();
             }

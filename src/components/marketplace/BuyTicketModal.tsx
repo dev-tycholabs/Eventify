@@ -2,7 +2,7 @@
 
 import { formatEther } from "viem";
 import type { MarketplaceListing } from "@/types/ticket";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getNativeCurrencySymbol, SUPPORTED_CHAINS } from "@/config/chains";
 
 interface BuyTicketModalProps {
     isOpen: boolean;
@@ -25,7 +25,8 @@ export function BuyTicketModal({
     venue,
     isLoading = false,
 }: BuyTicketModalProps) {
-    const { currencySymbol } = useChainConfig();
+    const currencySymbol = listing ? getNativeCurrencySymbol(listing.chainId) : "ETH";
+    const chainName = listing ? SUPPORTED_CHAINS.find(c => c.id === listing.chainId)?.name : undefined;
     if (!isOpen || !listing) return null;
 
     const formattedDate = eventDate?.toLocaleDateString("en-US", {

@@ -78,6 +78,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
                 .map((e) => ({
                     id: e.id,
                     contractAddress: e.contract_address as `0x${string}`,
+                    chainId: e.chain_id,
                     name: e.name,
                     description: e.description || "",
                     date: e.date ? new Date(e.date) : new Date(),
