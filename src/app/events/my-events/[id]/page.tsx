@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import { Header } from "@/components/Header";
 import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
@@ -12,6 +14,7 @@ import { EventTicketScanner } from "@/components/events/EventTicketScanner";
 import { RoyaltySplitterPanel } from "@/components/events/RoyaltySplitterPanel";
 import { EventAttendeesPanel } from "@/components/events/EventAttendeesPanel";
 import { useChainConfig } from "@/hooks/useChainConfig";
+import { getExplorerUrl } from "@/config/chains";
 
 interface RoyaltyRecipientData {
     id: string;
@@ -57,6 +60,7 @@ interface EventData {
     organizer: string;
     contractAddress: `0x${string}`;
     contractBalance: bigint;
+    chainId: number;
     description: string | null;
     imageUrl: string | null;
     royaltySplitterAddress: string | null;
@@ -69,10 +73,9 @@ export default function EventManagePage() {
     const eventId = params.id as string;
 
     const { address, isConnected } = useAccount();
-    const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
     const { writeContractAsync } = useWriteContract();
-    const { explorerUrl, currencySymbol } = useChainConfig();
+    const { currencySymbol } = useChainConfig();
 
     const [eventData, setEventData] = useState<EventData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -113,15 +116,17 @@ export default function EventManagePage() {
             }
 
             const contractAddress = event.contract_address as `0x${string}`;
+            const eventChainId = event.chain_id as number;
 
-            // Fetch contract balance if publicClient is available
+            // Fetch contract balance using chain-specific client
             let balance = BigInt(0);
-            if (publicClient) {
-                try {
-                    balance = await publicClient.getBalance({ address: contractAddress });
-                } catch (err) {
-                    console.error("Failed to fetch balance:", err);
+            try {
+                const chainPublicClient = getPublicClient(config, { chainId: eventChainId });
+                if (chainPublicClient) {
+                    balance = await chainPublicClient.getBalance({ address: contractAddress });
                 }
+            } catch (err) {
+                console.error("Failed to fetch balance:", err);
             }
 
             // Compute resale stats
@@ -154,6 +159,7 @@ export default function EventManagePage() {
                 organizer: event.organizer_address,
                 contractAddress,
                 contractBalance: balance,
+                chainId: eventChainId,
                 description: event.description,
                 imageUrl: event.image_url,
                 royaltySplitterAddress: event.royalty_splitter_address || null,
@@ -167,7 +173,7 @@ export default function EventManagePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [eventId, publicClient, address]);
+    }, [eventId]);
 
     useEffect(() => {
         if (eventId) {
@@ -187,10 +193,13 @@ export default function EventManagePage() {
 
     // Fetch current base URI from contract
     const fetchBaseURI = useCallback(async () => {
-        if (!publicClient || !eventData?.contractAddress) return;
+        if (!eventData?.contractAddress || !eventData?.chainId) return;
 
         try {
-            const baseURI = await publicClient.readContract({
+            const chainPublicClient = getPublicClient(config, { chainId: eventData.chainId });
+            if (!chainPublicClient) return;
+
+            const baseURI = await chainPublicClient.readContract({
                 address: eventData.contractAddress,
                 abi: EventTicketABI,
                 functionName: "baseTokenURI",
@@ -200,7 +209,7 @@ export default function EventManagePage() {
             console.error("Failed to fetch base URI:", err);
             setCurrentBaseURI("");
         }
-    }, [publicClient, eventData?.contractAddress]);
+    }, [eventData?.contractAddress, eventData?.chainId]);
 
     // Fetch base URI when event data is available
     useEffect(() => {
@@ -616,7 +625,7 @@ export default function EventManagePage() {
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Address</span>
                                         <a
-                                            href={`${explorerUrl}/address/${eventData.contractAddress}`}
+                                            href={`${getExplorerUrl(eventData.chainId)}/address/${eventData.contractAddress}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sm text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
