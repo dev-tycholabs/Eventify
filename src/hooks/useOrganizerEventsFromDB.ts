@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useAccount, usePublicClient } from "wagmi";
+import { useAccount } from "wagmi";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import type { Tables } from "@/lib/supabase/types";
 
 type Event = Tables<"events">;
@@ -28,10 +30,9 @@ export function useOrganizerEventsFromDB() {
     const [isLoading, setIsLoading] = useState(false);
     const [organizerEvents, setOrganizerEvents] = useState<OrganizerEventFromDB[]>([]);
     const { address, isConnected } = useAccount();
-    const publicClient = usePublicClient();
 
     const fetchOrganizerEvents = useCallback(async () => {
-        if (!address || !publicClient) {
+        if (!address) {
             setOrganizerEvents([]);
             return;
         }
@@ -60,13 +61,17 @@ export function useOrganizerEventsFromDB() {
                     .filter((event) => event.contract_address) // Only events with contract
                     .map(async (event) => {
                         const contractAddress = event.contract_address as `0x${string}`;
+                        const eventChainId = event.chain_id as number;
 
-                        // Single blockchain call per event
+                        // Get public client for the specific blockchain
                         let balance = BigInt(0);
                         try {
-                            balance = await publicClient.getBalance({ address: contractAddress });
+                            const chainPublicClient = getPublicClient(config, { chainId: eventChainId });
+                            if (chainPublicClient) {
+                                balance = await chainPublicClient.getBalance({ address: contractAddress });
+                            }
                         } catch (err) {
-                            console.error(`Failed to fetch balance for ${contractAddress}:`, err);
+                            console.error(`Failed to fetch balance for ${contractAddress} on chain ${eventChainId}:`, err);
                         }
 
                         const totalSupply = event.total_supply || 0;
@@ -75,7 +80,7 @@ export function useOrganizerEventsFromDB() {
                         return {
                             id: event.id,
                             contractAddress,
-                            chainId: event.chain_id,
+                            chainId: eventChainId,
                             name: event.name,
                             venue: event.venue || "",
                             date: event.date ? new Date(event.date) : new Date(),
@@ -98,7 +103,7 @@ export function useOrganizerEventsFromDB() {
         } finally {
             setIsLoading(false);
         }
-    }, [address, publicClient]);
+    }, [address]);
 
     useEffect(() => {
         if (isConnected && address) {
