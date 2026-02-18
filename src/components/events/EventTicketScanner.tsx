@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient, useWalletClient, useSwitchChain } from "wagmi";
 import { isAddress } from "viem";
 import { EventTicketABI } from "@/hooks/contracts";
 import { QRScanner } from "@/components/verify/QRScanner";
 import { WalletQRScanner } from "./WalletQRScanner";
 import { txToast } from "@/utils/toast";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface EventTicketScannerProps {
     eventContractAddress: `0x${string}`;
     eventName: string;
+    eventChainId: number; // Add chain ID prop
 }
 
 interface ScannedTicket {
@@ -30,9 +32,11 @@ interface UserTickets {
     }[];
 }
 
-export function EventTicketScanner({ eventContractAddress, eventName }: EventTicketScannerProps) {
+export function EventTicketScanner({ eventContractAddress, eventName, eventChainId }: EventTicketScannerProps) {
     const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
+    const { switchChainAsync } = useSwitchChain();
+    const { chainId: connectedChainId } = useChainConfig();
 
     const [mode, setMode] = useState<"scan" | "lookup">("scan");
     const [isVerifying, setIsVerifying] = useState(false);
@@ -218,6 +222,21 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
     const markTicketAsUsed = useCallback(async (tokenId: bigint) => {
         if (!walletClient || !publicClient) return;
 
+        // Check if we're on the wrong chain
+        const isWrongChain = connectedChainId !== eventChainId;
+
+        if (isWrongChain) {
+            try {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+                txToast.success("Network switched! Please click Check In again.");
+                return; // User needs to click again after switch
+            } catch (err) {
+                txToast.error("Network switch rejected");
+                return;
+            }
+        }
+
         setIsMarkingUsed(true);
         try {
             txToast.pending("Marking ticket as used...");
@@ -275,7 +294,7 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
         } finally {
             setIsMarkingUsed(false);
         }
-    }, [walletClient, publicClient, eventContractAddress, scannedTicket, userTickets]);
+    }, [walletClient, publicClient, eventContractAddress, scannedTicket, userTickets, connectedChainId, eventChainId, switchChainAsync]);
 
     const handleQRScanSuccess = useCallback((contract: string, tokenId: string) => {
         verifyTicket(contract, tokenId);

@@ -657,6 +657,7 @@ export default function EventManagePage() {
                         <EventTicketScanner
                             eventContractAddress={eventData.contractAddress}
                             eventName={eventData.name}
+                            eventChainId={eventData.chainId}
                         />
                     )}
 
