@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
+import { useAccount, useWalletClient, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
 import { getPublicClient } from "wagmi/actions";
 import { config } from "@/config/wagmi-client";

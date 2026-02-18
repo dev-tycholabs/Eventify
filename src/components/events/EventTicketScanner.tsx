@@ -7,6 +7,7 @@ import { EventTicketABI } from "@/hooks/contracts";
 import { QRScanner } from "@/components/verify/QRScanner";
 import { WalletQRScanner } from "./WalletQRScanner";
 import { txToast } from "@/utils/toast";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 interface EventTicketScannerProps {
     eventContractAddress: `0x${string}`;
@@ -43,13 +44,8 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
     const [isMarkingUsed, setIsMarkingUsed] = useState(false);
     const [showWalletScanner, setShowWalletScanner] = useState(false);
 
-    // Verify a single ticket from QR scan
+    // Verify a single ticket from QR scan (DATABASE-FIRST)
     const verifyTicket = useCallback(async (scannedContract: string, tokenIdStr: string) => {
-        if (!publicClient) {
-            setError("Please connect your wallet first");
-            return;
-        }
-
         // Check if the scanned QR is for this event
         if (scannedContract.toLowerCase() !== eventContractAddress.toLowerCase()) {
             setError(`This ticket is for a different event. Expected contract: ${eventContractAddress.slice(0, 10)}...`);
@@ -63,23 +59,49 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
 
         try {
             const tokenId = BigInt(tokenIdStr);
+            const supabase = getSupabaseClient();
 
-            const verifyResult = await publicClient.readContract({
-                address: eventContractAddress,
-                abi: EventTicketABI,
-                functionName: "verifyTicket",
-                args: [tokenId],
-            });
+            // Try database first (fast path)
+            const { data: ticket, error: dbError } = await supabase
+                .from("user_tickets")
+                .select("token_id, owner_address, is_used")
+                .eq("token_id", tokenIdStr)
+                .eq("event_contract_address", eventContractAddress.toLowerCase())
+                .single();
 
-            const [isValid, holder, isUsed] = verifyResult as [boolean, `0x${string}`, boolean];
+            if (ticket && !dbError) {
+                // Found in database - use cached data
+                setScannedTicket({
+                    tokenId,
+                    holder: ticket.owner_address as `0x${string}`,
+                    isUsed: ticket.is_used,
+                    isValid: true,
+                    scannedAddress: scannedContract,
+                });
+            } else {
+                // Not in database or error - fallback to blockchain
+                if (!publicClient) {
+                    setError("Please connect your wallet first");
+                    return;
+                }
 
-            setScannedTicket({
-                tokenId,
-                holder: isValid ? holder : "0x0000000000000000000000000000000000000000",
-                isUsed,
-                isValid,
-                scannedAddress: scannedContract,
-            });
+                const verifyResult = await publicClient.readContract({
+                    address: eventContractAddress,
+                    abi: EventTicketABI,
+                    functionName: "verifyTicket",
+                    args: [tokenId],
+                });
+
+                const [isValid, holder, isUsed] = verifyResult as [boolean, `0x${string}`, boolean];
+
+                setScannedTicket({
+                    tokenId,
+                    holder: isValid ? holder : "0x0000000000000000000000000000000000000000",
+                    isUsed,
+                    isValid,
+                    scannedAddress: scannedContract,
+                });
+            }
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             if (errorMessage.includes("TicketDoesNotExist") || errorMessage.includes("ERC721NonexistentToken")) {
@@ -93,16 +115,17 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
     }, [publicClient, eventContractAddress]);
 
 
-    // Look up all tickets owned by a wallet address or username
+    // Look up all tickets owned by a wallet address or username (DATABASE-FIRST)
     const lookupUserTickets = useCallback(async (addressOrUsername?: string) => {
         const input = addressOrUsername || lookupAddress;
-        if (!publicClient || !input.trim()) return;
+        if (!input.trim()) return;
 
         setIsLookingUp(true);
         setError(null);
         setUserTickets(null);
 
         try {
+            const supabase = getSupabaseClient();
             let walletAddr: `0x${string}`;
 
             // Check if input is a valid address or a username
@@ -120,43 +143,69 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
                 walletAddr = data.user.wallet_address as `0x${string}`;
             }
 
-            // Get all tickets owned by this address for this event
-            const ticketIds = await publicClient.readContract({
-                address: eventContractAddress,
-                abi: EventTicketABI,
-                functionName: "getTicketsByOwner",
-                args: [walletAddr],
-            }) as bigint[];
+            // Query database for tickets (fast path)
+            const { data: tickets, error: dbError } = await supabase
+                .from("user_tickets")
+                .select("token_id, is_used")
+                .eq("owner_address", walletAddr.toLowerCase())
+                .eq("event_contract_address", eventContractAddress.toLowerCase());
 
-            if (ticketIds.length === 0) {
+            if (!dbError && tickets) {
+                // Found in database - use cached data
+                const ticketsWithStatus = tickets.map(t => ({
+                    tokenId: BigInt(t.token_id),
+                    isUsed: t.is_used
+                }));
+
                 setUserTickets({
                     walletAddress: walletAddr,
-                    tickets: [],
+                    tickets: ticketsWithStatus,
                 });
-                return;
+            } else {
+                // Fallback to blockchain if database query fails
+                if (!publicClient) {
+                    setError("Please connect your wallet to verify tickets");
+                    setIsLookingUp(false);
+                    return;
+                }
+
+                const ticketIds = await publicClient.readContract({
+                    address: eventContractAddress,
+                    abi: EventTicketABI,
+                    functionName: "getTicketsByOwner",
+                    args: [walletAddr],
+                }) as bigint[];
+
+                if (ticketIds.length === 0) {
+                    setUserTickets({
+                        walletAddress: walletAddr,
+                        tickets: [],
+                    });
+                    return;
+                }
+
+                // Check usage status for each ticket
+                const ticketsWithStatus = await Promise.all(
+                    ticketIds.map(async (tokenId) => {
+                        try {
+                            const isUsed = await publicClient.readContract({
+                                address: eventContractAddress,
+                                abi: EventTicketABI,
+                                functionName: "ticketUsed",
+                                args: [tokenId],
+                            }) as boolean;
+                            return { tokenId, isUsed };
+                        } catch {
+                            return { tokenId, isUsed: false };
+                        }
+                    })
+                );
+
+                setUserTickets({
+                    walletAddress: walletAddr,
+                    tickets: ticketsWithStatus,
+                });
             }
-
-            // Check usage status for each ticket
-            const ticketsWithStatus = await Promise.all(
-                ticketIds.map(async (tokenId) => {
-                    try {
-                        const isUsed = await publicClient.readContract({
-                            address: eventContractAddress,
-                            abi: EventTicketABI,
-                            functionName: "ticketUsed",
-                            args: [tokenId],
-                        }) as boolean;
-                        return { tokenId, isUsed };
-                    } catch {
-                        return { tokenId, isUsed: false };
-                    }
-                })
-            );
-
-            setUserTickets({
-                walletAddress: walletAddr,
-                tickets: ticketsWithStatus,
-            });
         } catch (err) {
             console.error("Failed to lookup tickets:", err);
             setError("Failed to look up tickets. Please try again.");
@@ -165,7 +214,7 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
         }
     }, [publicClient, lookupAddress, eventContractAddress]);
 
-    // Mark a ticket as used
+    // Mark a ticket as used (BLOCKCHAIN WRITE + DATABASE UPDATE)
     const markTicketAsUsed = useCallback(async (tokenId: bigint) => {
         if (!walletClient || !publicClient) return;
 
@@ -173,6 +222,7 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
         try {
             txToast.pending("Marking ticket as used...");
 
+            // 1. Write to blockchain (source of truth)
             const hash = await walletClient.writeContract({
                 address: eventContractAddress,
                 abi: EventTicketABI,
@@ -180,10 +230,28 @@ export function EventTicketScanner({ eventContractAddress, eventName }: EventTic
                 args: [tokenId],
             });
 
+            // 2. Wait for transaction confirmation
             await publicClient.waitForTransactionReceipt({ hash });
+
             txToast.success("Ticket marked as used!");
 
-            // Update local state
+            // 3. Update database cache for fast future reads
+            const supabase = getSupabaseClient();
+            const { error: updateError } = await supabase
+                .from("user_tickets")
+                .update({
+                    is_used: true,
+                    used_at: new Date().toISOString()
+                })
+                .eq("token_id", tokenId.toString())
+                .eq("event_contract_address", eventContractAddress.toLowerCase());
+
+            if (updateError) {
+                console.error("Failed to update database cache:", updateError);
+                // Don't show error to user - blockchain is source of truth
+            }
+
+            // 4. Update local state
             if (scannedTicket && scannedTicket.tokenId === tokenId) {
                 setScannedTicket({ ...scannedTicket, isUsed: true });
             }
