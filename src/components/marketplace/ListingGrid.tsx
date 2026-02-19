@@ -6,13 +6,6 @@ import { ListingCard } from "./ListingCard";
 import { ListingCardSkeleton } from "./ListingCardSkeleton";
 import { StyledSelect } from "@/components/ui/StyledSelect";
 
-const SORT_OPTIONS = [
-    { value: "newest", label: "Newest First" },
-    { value: "oldest", label: "Oldest First" },
-    { value: "price_low", label: "Price: Low to High" },
-    { value: "price_high", label: "Price: High to Low" },
-];
-
 interface EventInfo {
     name: string;
     date: Date;
@@ -28,9 +21,9 @@ interface ListingGridProps {
     onBuy?: (listing: MarketplaceListing) => void;
     onCancel?: (listing: MarketplaceListing) => void;
     processingListingId?: bigint | null;
+    sortBy?: string;
 }
 
-type SortOption = "newest" | "oldest" | "price_low" | "price_high";
 
 export function ListingGrid({
     listings,
@@ -40,8 +33,8 @@ export function ListingGrid({
     onBuy,
     onCancel,
     processingListingId,
+    sortBy = "newest",
 }: ListingGridProps) {
-    const [sortBy, setSortBy] = useState<SortOption>("newest");
     const [filterEvent, setFilterEvent] = useState<string>("all");
 
     // Get unique events for filter dropdown
@@ -104,13 +97,6 @@ export function ListingGrid({
         <div>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <StyledSelect
-                    label="Sort by:"
-                    value={sortBy}
-                    onChange={(val) => setSortBy(val as SortOption)}
-                    options={SORT_OPTIONS}
-                />
-
                 {uniqueEvents.length > 1 && (
                     <StyledSelect
                         label="Event:"
@@ -126,9 +112,7 @@ export function ListingGrid({
                     />
                 )}
 
-                <div className="sm:ml-auto text-sm text-gray-400">
-                    {filteredListings.length} listing{filteredListings.length !== 1 ? "s" : ""}
-                </div>
+
             </div>
 
             {/* Grid */}

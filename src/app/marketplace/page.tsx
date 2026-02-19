@@ -13,12 +13,21 @@ import {
 } from "@/components/marketplace";
 import type { MarketplaceListing } from "@/types/ticket";
 import { ChainFilter } from "@/components/ui/ChainFilter";
+import { StyledSelect } from "@/components/ui/StyledSelect";
+
+const SORT_OPTIONS = [
+    { value: "newest", label: "Newest First" },
+    { value: "oldest", label: "Oldest First" },
+    { value: "price_low", label: "Price: Low to High" },
+    { value: "price_high", label: "Price: High to Low" },
+];
 
 export default function MarketplacePage() {
     const { address, isConnected } = useAccount();
     const { chainId } = useChainConfig();
     const { switchChainAsync } = useSwitchChain();
     const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [sortBy, setSortBy] = useState("newest");
 
     // Get listings from database (not blockchain)
     const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active", chainId: selectedChainId });
@@ -203,7 +212,14 @@ export default function MarketplacePage() {
                             Buy and sell tickets securely with blockchain verification
                         </p>
                     </div>
-                    <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                    <div className="flex items-center gap-3">
+                        <StyledSelect
+                            value={sortBy}
+                            onChange={setSortBy}
+                            options={SORT_OPTIONS}
+                        />
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                    </div>
                 </div>
 
                 {/* Wallet Connection Notice */}
@@ -251,6 +267,7 @@ export default function MarketplacePage() {
                         onBuy={handleBuyClick}
                         onCancel={handleCancelListing}
                         processingListingId={processingListingId}
+                        sortBy={sortBy}
                     />
                 )}
             </div>
