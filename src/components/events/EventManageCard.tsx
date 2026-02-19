@@ -18,7 +18,12 @@ export function EventManageCard({ event, onManage, onWithdraw }: EventManageCard
     const { resaleData } = useEventResales(event.id);
     const currencySymbol = getNativeCurrencySymbol(event.chainId);
     const chainName = SUPPORTED_CHAINS.find(c => c.id === event.chainId)?.name;
-    const isPast = event.date < new Date();
+    const now = new Date();
+    const isToday = event.date.toDateString() === now.toDateString();
+    const isPast = !isToday && event.date < now;
+    const ticketsRemaining = event.maxSupply - event.soldCount;
+    const isSoldOut = ticketsRemaining <= 0;
+    const isLowStock = ticketsRemaining > 0 && ticketsRemaining <= 10;
     const soldPercentage = (event.soldCount / event.maxSupply) * 100;
     const hasBalance = event.contractBalance > BigInt(0);
 
@@ -74,22 +79,35 @@ export function EventManageCard({ event, onManage, onWithdraw }: EventManageCard
                             </div>
                         )}
 
-                        {/* Status Badge */}
-                        <span
-                            className={`absolute top-3 right-3 px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ${isPast
-                                ? "bg-gray-500/90 text-gray-100"
-                                : "bg-green-500/90 text-white"
-                                }`}
-                        >
-                            {isPast ? "Past" : "Active"}
-                        </span>
-
-                        {/* Chain Badge */}
-                        {chainName && (
-                            <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded-full">
-                                {chainName}
-                            </div>
-                        )}
+                        {/* Badges - top left (status + chain) */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-2">
+                            {isSoldOut ? (
+                                <span className="px-2 py-1 bg-red-500/80 text-white text-xs font-semibold rounded">
+                                    Sold Out
+                                </span>
+                            ) : isLowStock ? (
+                                <span className="px-2 py-1 bg-orange-500/80 text-white text-xs font-semibold rounded">
+                                    {ticketsRemaining} Left
+                                </span>
+                            ) : isToday ? (
+                                <span className="px-2 py-1 bg-pink-500/80 text-white text-xs font-semibold rounded animate-pulse">
+                                    Live
+                                </span>
+                            ) : isPast ? (
+                                <span className="px-2 py-1 bg-gray-500/80 text-white text-xs font-semibold rounded">
+                                    Past
+                                </span>
+                            ) : (
+                                <span className="px-2 py-1 bg-green-500/80 text-white text-xs font-semibold rounded">
+                                    Upcoming
+                                </span>
+                            )}
+                            {chainName && (
+                                <span className="px-2 py-1 bg-purple-600/80 text-white text-xs font-semibold rounded">
+                                    {chainName}
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Header with event details */}

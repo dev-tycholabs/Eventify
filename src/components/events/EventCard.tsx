@@ -29,6 +29,10 @@ export function EventCard({ event, showDistance }: EventCardProps) {
     const isSoldOut = ticketsRemaining <= 0;
     const isLowStock = ticketsRemaining > 0 && ticketsRemaining <= 10;
 
+    const now = new Date();
+    const isToday = event.date.toDateString() === now.toDateString();
+    const isPastEvent = !isToday && event.date < now;
+
     return (
         <Link href={`/events/${event.id}`}>
             <div className="group bg-slate-800/50 rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
@@ -58,31 +62,44 @@ export function EventCard({ event, showDistance }: EventCardProps) {
                         </div>
                     )}
 
-                    {/* Status Badge */}
-                    {isSoldOut && (
-                        <div className="absolute top-3 right-3 px-3 py-1 bg-red-500/90 text-white text-xs font-semibold rounded-full">
-                            Sold Out
-                        </div>
-                    )}
-                    {isLowStock && !isSoldOut && (
-                        <div className="absolute top-3 right-3 px-3 py-1 bg-orange-500/90 text-white text-xs font-semibold rounded-full">
-                            Only {ticketsRemaining} left
-                        </div>
-                    )}
+                    {/* Badges - top left (status + chain) */}
+                    <div className="absolute top-3 left-3 flex flex-col gap-2">
+                        {isSoldOut ? (
+                            <span className="px-2 py-1 bg-red-500/80 text-white text-xs font-semibold rounded">
+                                Sold Out
+                            </span>
+                        ) : isLowStock ? (
+                            <span className="px-2 py-1 bg-orange-500/80 text-white text-xs font-semibold rounded">
+                                {ticketsRemaining} Left
+                            </span>
+                        ) : isToday ? (
+                            <span className="px-2 py-1 bg-pink-500/80 text-white text-xs font-semibold rounded animate-pulse">
+                                Live
+                            </span>
+                        ) : isPastEvent ? (
+                            <span className="px-2 py-1 bg-gray-500/80 text-white text-xs font-semibold rounded">
+                                Past
+                            </span>
+                        ) : (
+                            <span className="px-2 py-1 bg-green-500/80 text-white text-xs font-semibold rounded">
+                                Upcoming
+                            </span>
+                        )}
+                        {chainName && (
+                            <span className="px-2 py-1 bg-purple-600/80 text-white text-xs font-semibold rounded">
+                                {chainName}
+                            </span>
+                        )}
+                    </div>
+                    {/* Distance badge - top right */}
                     {showDistance && event.distance_km != null && (
-                        <div className="absolute top-3 left-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded-full flex items-center gap-1">
+                        <div className="absolute top-3 right-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded-full flex items-center gap-1">
                             <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                             </svg>
                             {event.distance_km < 1
                                 ? "< 1 km"
                                 : `${Math.round(event.distance_km)} km`}
-                        </div>
-                    )}
-                    {/* Chain Badge */}
-                    {chainName && (
-                        <div className={`absolute ${showDistance && event.distance_km != null ? 'bottom-3' : 'top-3'} left-3 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded-full`}>
-                            {chainName}
                         </div>
                     )}
                 </div>
