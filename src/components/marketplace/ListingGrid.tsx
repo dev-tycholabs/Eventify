@@ -4,6 +4,14 @@ import { useState, useMemo } from "react";
 import type { MarketplaceListing } from "@/types/ticket";
 import { ListingCard } from "./ListingCard";
 import { ListingCardSkeleton } from "./ListingCardSkeleton";
+import { StyledSelect } from "@/components/ui/StyledSelect";
+
+const SORT_OPTIONS = [
+    { value: "newest", label: "Newest First" },
+    { value: "oldest", label: "Oldest First" },
+    { value: "price_low", label: "Price: Low to High" },
+    { value: "price_high", label: "Price: High to Low" },
+];
 
 interface EventInfo {
     name: string;
@@ -96,42 +104,26 @@ export function ListingGrid({
         <div>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                    <label htmlFor="sort" className="text-sm text-gray-400">
-                        Sort by:
-                    </label>
-                    <select
-                        id="sort"
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as SortOption)}
-                        className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                    >
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="price_low">Price: Low to High</option>
-                        <option value="price_high">Price: High to Low</option>
-                    </select>
-                </div>
+                <StyledSelect
+                    label="Sort by:"
+                    value={sortBy}
+                    onChange={(val) => setSortBy(val as SortOption)}
+                    options={SORT_OPTIONS}
+                />
 
                 {uniqueEvents.length > 1 && (
-                    <div className="flex items-center gap-2">
-                        <label htmlFor="event" className="text-sm text-gray-400">
-                            Event:
-                        </label>
-                        <select
-                            id="event"
-                            value={filterEvent}
-                            onChange={(e) => setFilterEvent(e.target.value)}
-                            className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500 max-w-[200px]"
-                        >
-                            <option value="all">All Events</option>
-                            {uniqueEvents.map(([address, name]) => (
-                                <option key={address} value={address}>
-                                    {name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <StyledSelect
+                        label="Event:"
+                        value={filterEvent}
+                        onChange={setFilterEvent}
+                        options={[
+                            { value: "all", label: "All Events" },
+                            ...uniqueEvents.map(([address, name]) => ({
+                                value: address,
+                                label: name,
+                            })),
+                        ]}
+                    />
                 )}
 
                 <div className="sm:ml-auto text-sm text-gray-400">
