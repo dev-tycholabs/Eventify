@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useSwitchChain } from "wagmi";
 import { formatEther } from "viem";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import {
     RoyaltySplitterABI,
     TicketMarketplaceABI,
 } from "@/hooks/contracts";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { getContractsForChain, getExplorerUrl, getNativeCurrencySymbol } from "@/config/chains";
 import { txToast } from "@/utils/toast";
 
 const NATIVE_CURRENCY = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as const;
@@ -37,6 +39,7 @@ interface RoyaltySplitterPanelProps {
     organizerAddress: string;
     splitterAddress: string | null;
     recipients: RoyaltyRecipientData[];
+    eventChainId: number;
     onDistributionSynced?: () => void;
 }
 
@@ -44,16 +47,21 @@ interface RoyaltySplitterPanelProps {
 function DirectClaimPanel({
     eventId,
     organizerAddress,
+    eventChainId,
     onDistributionSynced,
 }: {
     eventId: string;
     organizerAddress: string;
+    eventChainId: number;
     onDistributionSynced?: () => void;
 }) {
-    const { address } = useAccount();
-    const publicClient = usePublicClient();
+    const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
-    const { contracts, explorerUrl, currencySymbol } = useChainConfig();
+    const { switchChainAsync } = useSwitchChain();
+
+    const contracts = getContractsForChain(eventChainId);
+    const explorerUrl = getExplorerUrl(eventChainId);
+    const currencySymbol = getNativeCurrencySymbol(eventChainId);
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [isClaiming, setIsClaiming] = useState(false);
@@ -66,14 +74,17 @@ function DirectClaimPanel({
 
     // Fetch claimable balance from marketplace for the organizer
     const fetchClaimable = useCallback(async () => {
-        if (!publicClient) return;
+        if (!contracts) return;
 
         setIsLoadingChain(true);
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: contracts!.TicketMarketplace,
+                    address: contracts.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "claimableFunds",
                     args: [organizerAddr, NATIVE_CURRENCY],
@@ -87,7 +98,7 @@ function DirectClaimPanel({
         } finally {
             setIsLoadingChain(false);
         }
-    }, [publicClient, organizerAddr, contracts]);
+    }, [eventChainId, organizerAddr, contracts]);
 
     // Fetch distribution history and total claimed from Supabase
     const fetchDistributions = useCallback(async () => {
@@ -117,22 +128,30 @@ function DirectClaimPanel({
     }, [fetchDistributions]);
 
     const handleDirectClaim = async () => {
-        if (!address) return;
+        if (!address || !contracts) return;
 
         setIsClaiming(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+            }
+
             // Snapshot the claimable amount before the tx
             const claimedAmount = marketplaceClaimable;
 
             txToast.pending("Claiming royalties from marketplace...");
             const hash = await writeContractAsync({
-                address: contracts!.TicketMarketplace,
+                address: contracts.TicketMarketplace,
                 abi: TicketMarketplaceABI,
                 functionName: "claimFunds",
                 args: [NATIVE_CURRENCY],
+                chainId: eventChainId,
             });
 
             // Wait for confirmation
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
             if (publicClient) {
                 await publicClient.waitForTransactionReceipt({ hash });
             }
@@ -332,12 +351,16 @@ export function RoyaltySplitterPanel({
     organizerAddress,
     splitterAddress,
     recipients,
+    eventChainId,
     onDistributionSynced,
 }: RoyaltySplitterPanelProps) {
-    const { address } = useAccount();
-    const publicClient = usePublicClient();
+    const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
-    const { contracts, explorerUrl, currencySymbol } = useChainConfig();
+    const { switchChainAsync } = useSwitchChain();
+
+    const contracts = getContractsForChain(eventChainId);
+    const explorerUrl = getExplorerUrl(eventChainId);
+    const currencySymbol = getNativeCurrencySymbol(eventChainId);
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [splitterBalance, setSplitterBalance] = useState<bigint>(BigInt(0));
@@ -352,17 +375,20 @@ export function RoyaltySplitterPanel({
 
     // Fetch on-chain balances
     const fetchOnChainBalances = useCallback(async () => {
-        if (!publicClient || !hasSplitter || !splitterAddr) return;
+        if (!hasSplitter || !splitterAddr || !contracts) return;
 
         setIsLoadingChain(true);
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             const balance = await publicClient.getBalance({ address: splitterAddr });
             setSplitterBalance(balance);
 
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: contracts!.TicketMarketplace,
+                    address: contracts.TicketMarketplace,
                     abi: [
                         {
                             inputs: [
@@ -387,7 +413,7 @@ export function RoyaltySplitterPanel({
         } finally {
             setIsLoadingChain(false);
         }
-    }, [publicClient, hasSplitter, splitterAddr]);
+    }, [eventChainId, hasSplitter, splitterAddr, contracts]);
 
     // Fetch distribution history from Supabase
     const fetchDistributions = useCallback(async () => {
@@ -413,9 +439,12 @@ export function RoyaltySplitterPanel({
 
     // Wait for tx confirmation, read released() for each recipient, and sync to Supabase
     const syncDistributionToSupabase = async (txHash: `0x${string}`, action: "claim_and_distribute" | "distribute") => {
-        if (!publicClient || !splitterAddr || !address) return;
+        if (!splitterAddr || !address) return;
 
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             // Wait for the transaction to be mined before reading updated state
             await publicClient.waitForTransactionReceipt({ hash: txHash });
 
@@ -454,16 +483,25 @@ export function RoyaltySplitterPanel({
     };
 
     const handleClaimAndDistribute = async () => {
-        if (!splitterAddr) return;
+        if (!splitterAddr || !contracts) return;
 
         setIsClaiming(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+                // Small delay to let wagmi update internal state after chain switch
+                await new Promise((r) => setTimeout(r, 500));
+            }
+
             txToast.pending("Claiming royalties from marketplace and distributing...");
             const hash = await writeContractAsync({
                 address: splitterAddr,
                 abi: RoyaltySplitterABI,
                 functionName: "claimAndDistribute",
-                args: [contracts!.TicketMarketplace, NATIVE_CURRENCY],
+                args: [contracts.TicketMarketplace, NATIVE_CURRENCY],
+                chainId: eventChainId,
             });
 
             // Sync on-chain state to Supabase (waits for tx confirmation internally)
@@ -488,11 +526,18 @@ export function RoyaltySplitterPanel({
 
         setIsDistributing(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+            }
+
             txToast.pending("Distributing royalties to recipients...");
             const hash = await writeContractAsync({
                 address: splitterAddr,
                 abi: RoyaltySplitterABI,
                 functionName: "distribute",
+                chainId: eventChainId,
             });
 
             // Sync on-chain state to Supabase (waits for tx confirmation internally)
@@ -518,6 +563,7 @@ export function RoyaltySplitterPanel({
             <DirectClaimPanel
                 eventId={eventId}
                 organizerAddress={organizerAddress}
+                eventChainId={eventChainId}
                 onDistributionSynced={onDistributionSynced}
             />
         );

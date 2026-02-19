@@ -669,6 +669,7 @@ export default function EventManagePage() {
                             organizerAddress={eventData.organizer}
                             splitterAddress={eventData.royaltySplitterAddress}
                             recipients={eventData.royaltyRecipients}
+                            eventChainId={eventData.chainId}
                             onDistributionSynced={fetchEventData}
                         />
                     )}
