@@ -6,6 +6,7 @@ import { useEventsFromDB } from "@/hooks/useEventsFromDB";
 import { useEventDates } from "@/hooks/useEventDates";
 import { useGeolocationContext } from "@/components/providers/GeolocationProvider";
 import { EventCard, EventCardSkeleton, EmptyState, EventCalendarFilter } from "@/components/events";
+import { ChainFilter } from "@/components/ui/ChainFilter";
 
 type LocationTab = "all" | "nearby" | "city" | "search";
 
@@ -237,6 +238,7 @@ export default function EventsPage() {
     const [selectedRadius, setSelectedRadius] = useState(50);
     const [searchCity, setSearchCity] = useState<CityResult | null>(null);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
     const [showCalendar, setShowCalendar] = useState(false);
     const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
     const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth() + 1);
@@ -274,8 +276,12 @@ export default function EventsPage() {
             base.date = selectedDate;
         }
 
+        if (selectedChainId) {
+            base.chainId = selectedChainId;
+        }
+
         return base;
-    }, [activeTab, hasLocation, latitude, longitude, selectedRadius, city, searchCity, selectedDate]);
+    }, [activeTab, hasLocation, latitude, longitude, selectedRadius, city, searchCity, selectedDate, selectedChainId]);
 
     const { events, isLoading, error, refetch } = useEventsFromDB(fetchOptions);
 
@@ -359,6 +365,8 @@ export default function EventsPage() {
                                 setActiveTab(c ? "search" : "all");
                             }}
                         />
+
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
 
                         {/* Calendar toggle */}
                         <div ref={calendarRef} className="relative">

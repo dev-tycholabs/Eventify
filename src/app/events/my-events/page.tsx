@@ -9,6 +9,7 @@ import { EventManageCard, EventManageModal } from "@/components/events";
 import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
 import { useChainConfig } from "@/hooks/useChainConfig";
+import { ChainFilter } from "@/components/ui/ChainFilter";
 import type { Tables } from "@/lib/supabase/types";
 
 type Event = Tables<"events">;
@@ -17,11 +18,12 @@ type ViewMode = "drafts" | "published";
 export default function MyEventsPage() {
     const { address, isConnected } = useAccount();
     const { getEvents, deleteDraft } = useSupabase();
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
     const {
         organizerEvents,
         isLoading: isLoadingOnChain,
         refetch: refetchOnChain
-    } = useOrganizerEventsFromDB();
+    } = useOrganizerEventsFromDB({ chainId: selectedChainId });
     const { writeContractAsync } = useWriteContract();
     const { currencySymbol } = useChainConfig();
     const publicClient = usePublicClient();
@@ -163,6 +165,9 @@ export default function MyEventsPage() {
                             Drafts ({draftCount})
                             {viewMode === "drafts" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />}
                         </button>
+                    </div>
+                    <div className="pb-3">
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                     </div>
                 </div>
 

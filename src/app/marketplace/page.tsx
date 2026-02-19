@@ -12,14 +12,16 @@ import {
     MarketplaceEmptyState,
 } from "@/components/marketplace";
 import type { MarketplaceListing } from "@/types/ticket";
+import { ChainFilter } from "@/components/ui/ChainFilter";
 
 export default function MarketplacePage() {
     const { address, isConnected } = useAccount();
     const { chainId } = useChainConfig();
     const { switchChainAsync } = useSwitchChain();
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
 
     // Get listings from database (not blockchain)
-    const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active" });
+    const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active", chainId: selectedChainId });
 
     // Only use blockchain hook for write operations
     const { buyTicket, cancelListing } = useMarketplace();
@@ -194,11 +196,14 @@ export default function MarketplacePage() {
         <div className="min-h-screen bg-slate-900 pt-24 pb-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Page Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Ticket Marketplace</h1>
-                    <p className="text-gray-400">
-                        Buy and sell tickets securely with blockchain verification
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white mb-2">Ticket Marketplace</h1>
+                        <p className="text-gray-400">
+                            Buy and sell tickets securely with blockchain verification
+                        </p>
+                    </div>
+                    <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                 </div>
 
                 {/* Wallet Connection Notice */}

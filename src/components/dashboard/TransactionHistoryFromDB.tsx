@@ -7,10 +7,11 @@ import type { TransactionType } from "@/lib/supabase/types";
 
 interface TransactionHistoryFromDBProps {
     address: `0x${string}`;
+    chainId?: number | null;
 }
 
-export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBProps) {
-    const { transactions, isLoading } = useTransactionsFromDB({ user: address });
+export function TransactionHistoryFromDB({ address, chainId }: TransactionHistoryFromDBProps) {
+    const { transactions, isLoading } = useTransactionsFromDB({ user: address, chainId });
 
     const getTypeIcon = (type: TransactionType) => {
         switch (type) {

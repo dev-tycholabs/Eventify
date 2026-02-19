@@ -42,10 +42,11 @@ interface UseTransactionsFromDBOptions {
     txType?: TransactionType;
     eventContract?: string;
     autoFetch?: boolean;
+    chainId?: number | null;
 }
 
 export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
-    const { user, txType, eventContract, autoFetch = true } = options;
+    const { user, txType, eventContract, autoFetch = true, chainId } = options;
 
     const [transactions, setTransactions] = useState<TransactionFromDB[]>([]);
     const [rawTransactions, setRawTransactions] = useState<DBTransaction[]>([]);
@@ -67,6 +68,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
             params.set("user", user);
             if (txType) params.set("type", txType);
             if (eventContract) params.set("event_contract", eventContract);
+            if (chainId) params.set("chain_id", String(chainId));
 
             const response = await fetch(`/api/transactions?${params.toString()}`);
 
@@ -114,7 +116,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
         } finally {
             setIsLoading(false);
         }
-    }, [user, txType, eventContract]);
+    }, [user, txType, eventContract, chainId]);
 
     useEffect(() => {
         if (autoFetch) {

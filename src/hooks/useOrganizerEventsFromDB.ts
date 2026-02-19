@@ -26,7 +26,7 @@ export interface OrganizerEventFromDB {
     eventType: string;
 }
 
-export function useOrganizerEventsFromDB() {
+export function useOrganizerEventsFromDB(options: { chainId?: number | null } = {}) {
     const [isLoading, setIsLoading] = useState(false);
     const [organizerEvents, setOrganizerEvents] = useState<OrganizerEventFromDB[]>([]);
     const { address, isConnected } = useAccount();
@@ -40,9 +40,12 @@ export function useOrganizerEventsFromDB() {
         setIsLoading(true);
         try {
             // Fetch published events from Supabase API
-            const response = await fetch(
-                `/api/events?organizer=${address}&status=published`
-            );
+            const params = new URLSearchParams();
+            params.set("organizer", address);
+            params.set("status", "published");
+            if (options.chainId) params.set("chain_id", String(options.chainId));
+
+            const response = await fetch(`/api/events?${params.toString()}`);
 
             if (!response.ok) {
                 throw new Error("Failed to fetch events");
@@ -103,7 +106,7 @@ export function useOrganizerEventsFromDB() {
         } finally {
             setIsLoading(false);
         }
-    }, [address]);
+    }, [address, options.chainId]);
 
     useEffect(() => {
         if (isConnected && address) {

@@ -51,10 +51,11 @@ interface UseTicketsFromDBOptions {
     eventContract?: string;
     isListed?: boolean | null; // true = listed only, false = unlisted only, null/undefined = all
     autoFetch?: boolean;
+    chainId?: number | null;
 }
 
 export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
-    const { owner, eventContract, isListed, autoFetch = true } = options;
+    const { owner, eventContract, isListed, autoFetch = true, chainId } = options;
 
     const [tickets, setTickets] = useState<UserTicketFromDB[]>([]);
     const [rawTickets, setRawTickets] = useState<DBTicket[]>([]);
@@ -78,6 +79,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
             if (isListed !== null && isListed !== undefined) {
                 params.set("is_listed", isListed.toString());
             }
+            if (chainId) params.set("chain_id", String(chainId));
 
             const response = await fetch(`/api/tickets?${params.toString()}`);
 
@@ -132,7 +134,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
         } finally {
             setIsLoading(false);
         }
-    }, [owner, eventContract, isListed]);
+    }, [owner, eventContract, isListed, chainId]);
 
     useEffect(() => {
         if (autoFetch) {

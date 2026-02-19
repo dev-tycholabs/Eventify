@@ -29,11 +29,12 @@ interface UserTicket {
 interface TicketGalleryFromDBProps {
     address: `0x${string}`;
     filter?: "all" | "unlisted" | "listed";
+    chainId?: number | null;
 }
 
-export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFromDBProps) {
+export function TicketGalleryFromDB({ address, filter = "all", chainId }: TicketGalleryFromDBProps) {
     const router = useRouter();
-    const { chainId } = useChainConfig();
+    const { chainId: walletChainId } = useChainConfig();
     const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
     const [transferTicket, setTransferTicket] = useState<UserTicket | null>(null);
     const [isListingLoading, setIsListingLoading] = useState(false);
@@ -48,6 +49,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
     const { tickets: dbTickets, isLoading, refetch: refetchTickets } = useTicketsFromDB({
         owner: address,
         isListed: isListedFilter,
+        chainId,
     });
 
     const { listTicket, cancelListing, transferTicket: transferTicketOnChain } = useMarketplace();
@@ -163,7 +165,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                     seller_address: address,
                     price: (ticket.listingPrice || ticket.ticketPrice).toString(),
                     action: "cancel",
-                    chain_id: chainId,
+                    chain_id: walletChainId,
                 });
 
                 if (result.txHash) {
@@ -176,7 +178,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                         event_id: eventId || undefined,
                         listing_id: ticket.listingId,
                         tx_timestamp: new Date().toISOString(),
-                        chain_id: chainId,
+                        chain_id: walletChainId,
                     });
                 }
 
@@ -187,7 +189,7 @@ export function TicketGalleryFromDB({ address, filter = "all" }: TicketGalleryFr
                     owner_address: address,
                     is_listed: false,
                     action: "unlist",
-                    chain_id: chainId,
+                    chain_id: walletChainId,
                 });
 
                 await refetchTickets();

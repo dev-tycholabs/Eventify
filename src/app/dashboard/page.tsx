@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { TicketGalleryFromDB } from "@/components/dashboard/TicketGalleryFromDB";
 import { TransactionHistoryFromDB } from "@/components/dashboard/TransactionHistoryFromDB";
+import { ChainFilter } from "@/components/ui/ChainFilter";
 
 type TabType = "tickets" | "history";
 type TicketFilter = "all" | "unlisted" | "listed";
@@ -12,6 +13,7 @@ export default function DashboardPage() {
     const { isConnected, address } = useAccount();
     const [activeTab, setActiveTab] = useState<TabType>("tickets");
     const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
 
     // Protected route - require wallet connection
     if (!isConnected) {
@@ -88,7 +90,8 @@ export default function DashboardPage() {
 
                     {/* Filter Dropdown - Only show on tickets tab */}
                     {activeTab === "tickets" && (
-                        <div className="relative pb-3">
+                        <div className="flex items-center gap-3 pb-3">
+                            <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                             <select
                                 value={ticketFilter}
                                 onChange={(e) => setTicketFilter(e.target.value as TicketFilter)}
@@ -109,13 +112,18 @@ export default function DashboardPage() {
                             </select>
                         </div>
                     )}
+                    {activeTab === "history" && (
+                        <div className="pb-3">
+                            <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Tab Content */}
                 {activeTab === "tickets" ? (
-                    <TicketGalleryFromDB address={address!} filter={ticketFilter} />
+                    <TicketGalleryFromDB address={address!} filter={ticketFilter} chainId={selectedChainId} />
                 ) : (
-                    <TransactionHistoryFromDB address={address!} />
+                    <TransactionHistoryFromDB address={address!} chainId={selectedChainId} />
                 )}
             </div>
         </div>

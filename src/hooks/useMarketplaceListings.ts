@@ -34,6 +34,7 @@ interface UseMarketplaceListingsOptions {
     status?: "active" | "sold" | "cancelled";
     seller?: string;
     eventContract?: string;
+    chainId?: number | null;
 }
 
 export function useMarketplaceListings(options: UseMarketplaceListingsOptions = {}) {
@@ -51,6 +52,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
             if (options.status) params.set("status", options.status);
             if (options.seller) params.set("seller", options.seller);
             if (options.eventContract) params.set("event_contract", options.eventContract);
+            if (options.chainId) params.set("chain_id", String(options.chainId));
 
             const response = await fetch(`/api/marketplace?${params.toString()}`);
             if (!response.ok) {
@@ -92,7 +94,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
         } finally {
             setIsLoading(false);
         }
-    }, [options.status, options.seller, options.eventContract]);
+    }, [options.status, options.seller, options.eventContract, options.chainId]);
 
     useEffect(() => {
         fetchListings();

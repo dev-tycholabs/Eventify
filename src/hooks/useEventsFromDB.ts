@@ -19,6 +19,7 @@ interface UseEventsFromDBOptions {
     state?: string | null;
     country?: string | null;
     date?: string | null;
+    chainId?: number | null;
 }
 
 export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
@@ -33,6 +34,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
         city,
         state,
         country,
+        chainId,
     } = options;
 
     const date = options.date ?? null;
@@ -60,6 +62,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
             if (state) params.set("state", state);
             if (country) params.set("country", country);
             if (date) params.set("date", date);
+            if (chainId) params.set("chain_id", String(chainId));
 
             const response = await fetch(`/api/events?${params.toString()}`);
 
@@ -105,7 +108,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
         } finally {
             setIsLoading(false);
         }
-    }, [status, organizer, lat, lon, radius, sortByDistance, city, state, country, date]);
+    }, [status, organizer, lat, lon, radius, sortByDistance, city, state, country, date, chainId]);
 
     useEffect(() => {
         if (autoFetch) {
