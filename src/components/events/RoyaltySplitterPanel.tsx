@@ -461,7 +461,7 @@ export function RoyaltySplitterPanel({
                 })
             );
 
-            await fetch(`/api/events/${eventId}/royalties`, {
+            const res = await fetch(`/api/events/${eventId}/royalties`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -470,8 +470,14 @@ export function RoyaltySplitterPanel({
                     triggered_by: address,
                     splitter_address: splitterAddr,
                     recipients: recipientReleased,
+                    chain_id: eventChainId,
                 }),
             });
+
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                console.error("Royalty sync API error:", res.status, errBody);
+            }
 
             // Refresh distribution history and notify parent
             await fetchDistributions();
