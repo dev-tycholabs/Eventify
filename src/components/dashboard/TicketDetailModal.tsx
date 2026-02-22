@@ -36,7 +36,7 @@ export function TicketDetailModal({
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
     const [showHistory, setShowHistory] = useState(false);
     const ticketRef = useRef<HTMLDivElement>(null);
-    const { currencySymbol } = useChainConfig();
+    const { currencySymbol, chainId } = useChainConfig();
 
     // Generate real QR code using the qrcode library - contains URL to verify page
     useEffect(() => {
@@ -48,7 +48,7 @@ export function TicketDetailModal({
         const generateQR = async () => {
             // Build verify URL with query params for direct scanning
             const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-            const verifyUrl = `${baseUrl}/verify?contract=${ticket.eventContractAddress}&tokenId=${ticket.tokenId.toString()}&event=${encodeURIComponent(ticket.eventName)}`;
+            const verifyUrl = `${baseUrl}/verify?contract=${ticket.eventContractAddress}&tokenId=${ticket.tokenId.toString()}&event=${encodeURIComponent(ticket.eventName)}&chainId=${chainId}`;
 
             try {
                 const dataUrl = await QRCode.toDataURL(verifyUrl, {
@@ -63,7 +63,7 @@ export function TicketDetailModal({
         };
 
         generateQR();
-    }, [ticket]);
+    }, [ticket, chainId]);
 
     const handleDownloadPNG = async () => {
         if (!ticket) return;

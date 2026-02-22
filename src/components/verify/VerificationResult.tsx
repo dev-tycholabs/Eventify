@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { createPublicClient, http } from "viem";
 import { EventTicketABI } from "@/hooks/contracts";
 import type { VerificationData } from "@/app/verify/page";
-import { useChainConfig } from "@/hooks/useChainConfig";
+import { SUPPORTED_CHAINS, getExplorerUrl } from "@/config/chains";
 
 interface VerificationResultProps {
     result: VerificationData;
@@ -12,11 +13,24 @@ interface VerificationResultProps {
 }
 
 export function VerificationResult({ result, onReset }: VerificationResultProps) {
-    const { isValid, holder, isUsed, eventName, eventVenue, eventDate, tokenId, eventAddress } = result;
-    const { address, isConnected } = useAccount();
-    const { explorerUrl, chainId } = useChainConfig();
-    const publicClient = usePublicClient();
+    const { isValid, holder, isUsed, eventName, eventVenue, eventDate, tokenId, eventAddress, chainId: ticketChainId } = result;
+    const { address, isConnected, chain: walletChain } = useAccount();
+    const explorerUrl = getExplorerUrl(ticketChainId);
+
+    // Get a public client for the ticket's chain (not the wallet's chain)
+    const ticketChain = SUPPORTED_CHAINS.find((c) => c.id === ticketChainId);
+    const ticketPublicClient = ticketChain
+        ? createPublicClient({ chain: ticketChain, transport: http() })
+        : null;
+
+    const walletPublicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
+
+    // Use the ticket's chain public client for reads, wallet client for writes
+    const publicClient = ticketPublicClient || walletPublicClient;
+
+    // Whether the wallet is on the correct chain for write operations
+    const isOnCorrectChain = walletChain?.id === ticketChainId;
 
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [isMarkingUsed, setIsMarkingUsed] = useState(false);
@@ -71,7 +85,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                     event_contract_address: eventAddress,
                     owner_address: holder,
                     action: "use",
-                    chain_id: chainId,
+                    chain_id: ticketChainId,
                 }),
             });
 
@@ -86,7 +100,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                     token_id: tokenId.toString(),
                     event_contract_address: eventAddress,
                     tx_timestamp: new Date().toISOString(),
-                    chain_id: chainId,
+                    chain_id: ticketChainId,
                 }),
             });
         } catch (syncError) {
@@ -97,6 +111,11 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
 
     const handleMarkAsUsed = async () => {
         if (!walletClient || !publicClient) return;
+
+        if (!isOnCorrectChain) {
+            setMarkAsUsedError(`Please switch your wallet to ${ticketChain?.name || "the correct network"} to mark this ticket as used.`);
+            return;
+        }
 
         setIsMarkingUsed(true);
         setMarkAsUsedError(null);
@@ -329,6 +348,14 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                                 {ticketMarkedUsed ? "Used" : "Valid"}
                             </span>
                         </div>
+
+                        {/* Chain Badge */}
+                        <div className="flex items-start justify-between gap-4 pt-3 border-t border-white/5">
+                            <span className="text-gray-400 text-sm">Network</span>
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+                                {ticketChain?.name || `Chain ${ticketChainId}`}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Mark as Used Section - Only for organizers/owners */}
@@ -350,6 +377,27 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
                                 </svg>
                                 <span className="text-sm font-medium text-purple-400">Organizer Actions</span>
                             </div>
+
+                            {!isOnCorrectChain && (
+                                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg mb-3">
+                                    <svg
+                                        className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                        />
+                                    </svg>
+                                    <p className="text-sm text-yellow-400">
+                                        Switch to {ticketChain?.name || "the correct network"} to mark this ticket as used.
+                                    </p>
+                                </div>
+                            )}
 
                             {markAsUsedError && (
                                 <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg mb-3">

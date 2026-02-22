@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 
 interface QRScannerProps {
-    onScanSuccess: (contract: string, tokenId: string) => void;
+    onScanSuccess: (contract: string, tokenId: string, chainId?: number) => void;
     onError: (error: string) => void;
     isVerifying: boolean;
 }
@@ -15,6 +15,7 @@ interface QRData {
     contract: string;
     tokenId: string;
     event?: string;
+    chainId?: number;
 }
 
 export function QRScanner({ onScanSuccess, onError, isVerifying }: QRScannerProps) {
@@ -32,12 +33,14 @@ export function QRScanner({ onScanSuccess, onError, isVerifying }: QRScannerProp
             const contract = url.searchParams.get("contract");
             const tokenId = url.searchParams.get("tokenId");
             const event = url.searchParams.get("event");
+            const chainIdParam = url.searchParams.get("chainId");
 
             if (contract && tokenId) {
                 return {
                     contract,
                     tokenId,
                     event: event || undefined,
+                    chainId: chainIdParam ? parseInt(chainIdParam, 10) : undefined,
                 };
             }
         } catch {
@@ -52,13 +55,18 @@ export function QRScanner({ onScanSuccess, onError, isVerifying }: QRScannerProp
                     contract: parsed.contract,
                     tokenId: parsed.tokenId.toString(),
                     event: parsed.event,
+                    chainId: parsed.chainId ? Number(parsed.chainId) : undefined,
                 };
             }
         } catch {
-            // Try alternative format: contract|tokenId
+            // Try alternative format: contract|tokenId or contract|tokenId|chainId
             const parts = data.split("|");
-            if (parts.length === 2 && parts[0].startsWith("0x")) {
-                return { contract: parts[0], tokenId: parts[1] };
+            if (parts.length >= 2 && parts[0].startsWith("0x")) {
+                return {
+                    contract: parts[0],
+                    tokenId: parts[1],
+                    chainId: parts[2] ? parseInt(parts[2], 10) : undefined,
+                };
             }
         }
         return null;
@@ -67,7 +75,7 @@ export function QRScanner({ onScanSuccess, onError, isVerifying }: QRScannerProp
     const handleScanSuccess = useCallback((decodedText: string) => {
         const qrData = parseQRData(decodedText);
         if (qrData) {
-            onScanSuccess(qrData.contract, qrData.tokenId);
+            onScanSuccess(qrData.contract, qrData.tokenId, qrData.chainId);
         } else {
             onError("Invalid QR code format. Please scan a valid ticket QR.");
         }

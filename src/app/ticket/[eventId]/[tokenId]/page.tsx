@@ -116,7 +116,7 @@ export default function TicketDetailPage() {
         if (!ticket) return;
         const generateQR = async () => {
             const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-            const verifyUrl = `${baseUrl}/verify?contract=${ticket.event_contract_address}&tokenId=${ticket.token_id}&event=${encodeURIComponent(ticket.events?.name || "")}`;
+            const verifyUrl = `${baseUrl}/verify?contract=${ticket.event_contract_address}&tokenId=${ticket.token_id}&event=${encodeURIComponent(ticket.events?.name || "")}&chainId=${chainId}`;
             try {
                 const dataUrl = await QRCode.toDataURL(verifyUrl, {
                     width: 200,
