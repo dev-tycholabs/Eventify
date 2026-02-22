@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { useSupabase } from "@/hooks/useSupabase";
-import { useMarketplace } from "@/hooks/useMarketplace";
 import { QRCodeModal } from "./QRCodeModal";
-import { useChainConfig } from "@/hooks/useChainConfig";
 import { notify } from "@/utils/toast";
 
 interface ProfileData {
@@ -18,8 +16,6 @@ interface ProfileData {
 export function ProfileForm() {
     const { address, isConnected } = useAccount();
     const { getUser, saveUser, isLoading } = useSupabase();
-    const { currencySymbol } = useChainConfig();
-    const { claimFunds, getClaimableBalance, isLoading: isClaimLoading } = useMarketplace();
 
     const [formData, setFormData] = useState<ProfileData>({
         name: "",
@@ -31,28 +27,6 @@ export function ProfileForm() {
     const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
     const [showQR, setShowQR] = useState(false);
     const [loadingProfile, setLoadingProfile] = useState(true);
-    const [claimableBalance, setClaimableBalance] = useState<bigint>(BigInt(0));
-    const [loadingBalance, setLoadingBalance] = useState(false);
-
-    // Load claimable balance
-    const loadClaimableBalance = useCallback(async () => {
-        if (!address) return;
-        setLoadingBalance(true);
-        try {
-            const balance = await getClaimableBalance();
-            setClaimableBalance(balance);
-        } catch (err) {
-            console.error("Failed to load claimable balance:", err);
-        } finally {
-            setLoadingBalance(false);
-        }
-    }, [address, getClaimableBalance]);
-
-    useEffect(() => {
-        if (isConnected && address) {
-            loadClaimableBalance();
-        }
-    }, [isConnected, address, loadClaimableBalance]);
 
     // Load existing profile
     useEffect(() => {
@@ -108,14 +82,6 @@ export function ProfileForm() {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleClaimFunds = async () => {
-        const result = await claimFunds();
-        if (result.success) {
-            // Refresh balance after successful claim
-            await loadClaimableBalance();
-        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -202,71 +168,6 @@ export function ProfileForm() {
                         </svg>
                     </button>
                 </div>
-            </div>
-
-            {/* Claimable Funds Section */}
-            <div className="mb-8 p-6 bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl border border-green-500/20">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                            <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Marketplace Earnings
-                        </h3>
-                        <p className="text-gray-400 text-sm mt-1">
-                            Funds from your ticket sales on the marketplace
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        {loadingBalance ? (
-                            <div className="animate-pulse bg-white/10 h-8 w-24 rounded" />
-                        ) : (
-                            <p className="text-2xl font-bold text-green-400">
-                                {(Number(claimableBalance) / 1e18).toFixed(4)} {currencySymbol}
-                            </p>
-                        )}
-                    </div>
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                    <button
-                        onClick={handleClaimFunds}
-                        disabled={isClaimLoading || claimableBalance === BigInt(0)}
-                        className="flex-1 py-3 px-4 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                        {isClaimLoading ? (
-                            <>
-                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Claiming...
-                            </>
-                        ) : (
-                            <>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                Claim Funds
-                            </>
-                        )}
-                    </button>
-                    <button
-                        onClick={loadClaimableBalance}
-                        disabled={loadingBalance}
-                        className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-300 cursor-pointer"
-                        title="Refresh balance"
-                    >
-                        <svg className={`w-5 h-5 ${loadingBalance ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </button>
-                </div>
-                {claimableBalance === BigInt(0) && !loadingBalance && (
-                    <p className="text-gray-500 text-sm mt-3 text-center">
-                        No funds to claim. Sell tickets on the marketplace to earn!
-                    </p>
-                )}
             </div>
 
             {/* Profile Form */}
