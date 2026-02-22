@@ -8,7 +8,8 @@ type MarketplaceListing = Tables<"marketplace_listings">;
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const status = searchParams.get("status") as ListingStatus | null;
+        const statusParam = searchParams.get("status");
+        const status = statusParam !== "all" ? statusParam as ListingStatus | null : null;
         const seller = searchParams.get("seller");
         const eventContract = searchParams.get("event_contract");
         const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
@@ -34,9 +35,10 @@ export async function GET(request: NextRequest) {
             .range(offset, offset + limit - 1);
 
         // Default to active listings if no status specified
+        // Use status=all to fetch all statuses
         if (status) {
             query = query.eq("status", status);
-        } else {
+        } else if (!statusParam) {
             query = query.eq("status", "active");
         }
 
@@ -56,23 +58,35 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
-        // Get total count with same filters
-        const countQuery = supabase
-            .from("marketplace_listings")
-            .select("id", { count: "exact", head: true });
+        // Get counts for each status (shared base filters, no status filter)
+        const buildBaseQuery = () => {
+            let q = supabase
+                .from("marketplace_listings")
+                .select("id", { count: "exact", head: true });
+            if (seller) q = q.eq("seller_address", seller.toLowerCase());
+            if (eventContract) q = q.eq("event_contract_address", eventContract.toLowerCase());
+            if (chainId) q = q.eq("chain_id", chainId);
+            return q;
+        };
 
-        if (status) {
-            countQuery.eq("status", status);
-        } else {
-            countQuery.eq("status", "active");
-        }
-        if (seller) countQuery.eq("seller_address", seller.toLowerCase());
-        if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
-        if (chainId) countQuery.eq("chain_id", chainId);
+        const [activeCount, soldCount, cancelledCount] = await Promise.all([
+            buildBaseQuery().eq("status", "active").then(r => r.count ?? 0),
+            buildBaseQuery().eq("status", "sold").then(r => r.count ?? 0),
+            buildBaseQuery().eq("status", "cancelled").then(r => r.count ?? 0),
+        ]);
 
-        const { count: totalCount } = await countQuery;
+        const totalCount = activeCount + soldCount + cancelledCount;
 
-        return NextResponse.json({ listings: data, totalCount: totalCount ?? 0 });
+        return NextResponse.json({
+            listings: data,
+            totalCount,
+            statusCounts: {
+                all: totalCount,
+                active: activeCount,
+                sold: soldCount,
+                cancelled: cancelledCount,
+            },
+        });
     } catch (error) {
         console.error("Error fetching marketplace listings:", error);
         return NextResponse.json(

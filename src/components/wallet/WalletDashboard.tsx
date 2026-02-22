@@ -264,8 +264,9 @@ function ChainEarningsCard({
     const busy = isClaiming || (isClaimLoading && isConnectedChain);
 
     return (
-        <div
-            className={`p-5 rounded-xl border transition-all ${hasBalance
+        <Link
+            href={`/wallet/resale-earnings/${chain.chainId}`}
+            className={`block p-5 rounded-xl border transition-all hover:ring-1 hover:ring-purple-500/40 ${hasBalance
                 ? "bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-500/20"
                 : "bg-slate-800/50 border-white/10"
                 }`}
@@ -290,23 +291,28 @@ function ChainEarningsCard({
                         <p className="text-gray-400 text-sm">Resale earnings</p>
                     </div>
                 </div>
-                <div className="text-right">
-                    {chain.loading ? (
-                        <div className="animate-pulse bg-white/10 h-7 w-24 rounded" />
-                    ) : chain.error ? (
-                        <p className="text-red-400 text-sm">Failed to load</p>
-                    ) : (
-                        <p className={`text-xl font-bold ${hasBalance ? "text-green-400" : "text-gray-500"}`}>
-                            {chain.formatted} {chain.currencySymbol}
-                        </p>
-                    )}
+                <div className="flex items-center gap-3">
+                    <div className="text-right">
+                        {chain.loading ? (
+                            <div className="animate-pulse bg-white/10 h-7 w-24 rounded" />
+                        ) : chain.error ? (
+                            <p className="text-red-400 text-sm">Failed to load</p>
+                        ) : (
+                            <p className={`text-xl font-bold ${hasBalance ? "text-green-400" : "text-gray-500"}`}>
+                                {chain.formatted} {chain.currencySymbol}
+                            </p>
+                        )}
+                    </div>
+                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                 </div>
             </div>
 
             {hasBalance && !chain.loading && (
                 <div className="mt-3">
                     <button
-                        onClick={onClaim}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClaim(); }}
                         disabled={busy}
                         className="w-full py-2.5 px-4 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer text-sm"
                     >
@@ -329,7 +335,7 @@ function ChainEarningsCard({
                     </button>
                 </div>
             )}
-        </div>
+        </Link>
     );
 }
 
