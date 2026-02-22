@@ -26,10 +26,14 @@ export interface OrganizerEventFromDB {
     eventType: string;
 }
 
-export function useOrganizerEventsFromDB(options: { chainId?: number | null } = {}) {
+export function useOrganizerEventsFromDB(options: { chainId?: number | null; page?: number; pageSize?: number } = {}) {
     const [isLoading, setIsLoading] = useState(false);
     const [organizerEvents, setOrganizerEvents] = useState<OrganizerEventFromDB[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const { address, isConnected } = useAccount();
+
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 12;
 
     const fetchOrganizerEvents = useCallback(async () => {
         if (!address) {
@@ -44,6 +48,8 @@ export function useOrganizerEventsFromDB(options: { chainId?: number | null } = 
             params.set("organizer", address);
             params.set("status", "published");
             if (options.chainId) params.set("chain_id", String(options.chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/events?${params.toString()}`);
 
@@ -51,7 +57,9 @@ export function useOrganizerEventsFromDB(options: { chainId?: number | null } = 
                 throw new Error("Failed to fetch events");
             }
 
-            const { events } = await response.json() as { events: Event[] };
+            const responseData = await response.json() as { events: Event[]; totalCount?: number };
+            const events = responseData.events;
+            setTotalCount(responseData.totalCount ?? events.length);
 
             if (!events || events.length === 0) {
                 setOrganizerEvents([]);
@@ -106,7 +114,7 @@ export function useOrganizerEventsFromDB(options: { chainId?: number | null } = 
         } finally {
             setIsLoading(false);
         }
-    }, [address, options.chainId]);
+    }, [address, options.chainId, page, pageSize]);
 
     useEffect(() => {
         if (isConnected && address) {
@@ -122,5 +130,7 @@ export function useOrganizerEventsFromDB(options: { chainId?: number | null } = 
         organizerEvents,
         isLoading,
         refetch,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

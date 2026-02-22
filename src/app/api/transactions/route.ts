@@ -65,7 +65,23 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
-        return NextResponse.json({ transactions: data });
+        // Get total count with same filters
+        const countQuery = supabase
+            .from("transactions")
+            .select("id", { count: "exact", head: true });
+
+        if (tokenId && eventContract) {
+            countQuery.eq("token_id", tokenId).eq("event_contract_address", eventContract.toLowerCase());
+        } else if (user) {
+            countQuery.eq("user_address", user.toLowerCase());
+            if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
+        }
+        if (txType) countQuery.eq("tx_type", txType);
+        if (chainId) countQuery.eq("chain_id", chainId);
+
+        const { count: totalCount } = await countQuery;
+
+        return NextResponse.json({ transactions: data, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching transactions:", error);
         return NextResponse.json(

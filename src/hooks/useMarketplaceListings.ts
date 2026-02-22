@@ -35,6 +35,8 @@ interface UseMarketplaceListingsOptions {
     seller?: string;
     eventContract?: string;
     chainId?: number | null;
+    page?: number;
+    pageSize?: number;
 }
 
 export function useMarketplaceListings(options: UseMarketplaceListingsOptions = {}) {
@@ -42,6 +44,10 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
     const [eventInfoMap, setEventInfoMap] = useState<Map<string, { name: string; date: Date; venue: string; image?: string }>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
+
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 12;
 
     const fetchListings = useCallback(async () => {
         setIsLoading(true);
@@ -53,6 +59,8 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
             if (options.seller) params.set("seller", options.seller);
             if (options.eventContract) params.set("event_contract", options.eventContract);
             if (options.chainId) params.set("chain_id", String(options.chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/marketplace?${params.toString()}`);
             if (!response.ok) {
@@ -61,6 +69,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
 
             const data = await response.json();
             const dbListings: DBListing[] = data.listings || [];
+            setTotalCount(data.totalCount ?? dbListings.length);
 
             // Transform DB listings to MarketplaceListing format
             const transformedListings: MarketplaceListing[] = dbListings.map((l) => ({
@@ -94,7 +103,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
         } finally {
             setIsLoading(false);
         }
-    }, [options.status, options.seller, options.eventContract, options.chainId]);
+    }, [options.status, options.seller, options.eventContract, options.chainId, page, pageSize]);
 
     useEffect(() => {
         fetchListings();
@@ -106,5 +115,7 @@ export function useMarketplaceListings(options: UseMarketplaceListingsOptions = 
         isLoading,
         error,
         refetch: fetchListings,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
             if (error) throw error;
             const events = (data || []) as EventWithRecipients[];
 
+
             // Build unique (city, state, country) triples from events
             const locationPairs = new Map<
                 string,
@@ -217,18 +218,43 @@ export async function GET(request: NextRequest) {
             }
 
             // Paginate
+            const totalCount = eventsWithDistance.length;
             const paginated = eventsWithDistance.slice(offset, offset + limit);
 
-            return NextResponse.json({ events: paginated });
+            return NextResponse.json({ events: paginated, totalCount });
         }
 
         // Standard pagination (no location)
+        // First get total count with the same filters (but no range)
+        const countQuery = supabase
+            .from("events")
+            .select("id", { count: "exact", head: true });
+
+        // Re-apply the same filters for count
+        if (organizer) countQuery.eq("organizer_address", organizer.toLowerCase());
+        if (status) countQuery.eq("status", status);
+        if (contractAddress) countQuery.eq("contract_address", contractAddress.toLowerCase());
+        if (chainId) countQuery.eq("chain_id", chainId);
+        if (cityFilter) countQuery.ilike("city", cityFilter);
+        if (stateFilter) countQuery.ilike("state", stateFilter);
+        if (countryFilter) countQuery.ilike("country", countryFilter);
+        if (dateFilter) {
+            countQuery.gte("date", `${dateFilter}T00:00:00`).lt("date", `${dateFilter}T23:59:59.999`);
+        } else if (monthFilter) {
+            const [y2, m2] = monthFilter.split("-").map(Number);
+            const startOfMonth2 = `${monthFilter}-01T00:00:00`;
+            const nextMonth2 = m2 === 12 ? `${y2 + 1}-01-01T00:00:00` : `${y2}-${String(m2 + 1).padStart(2, "0")}-01T00:00:00`;
+            countQuery.gte("date", startOfMonth2).lt("date", nextMonth2);
+        }
+
+        const { count: totalCount } = await countQuery;
+
         query = query.range(offset, offset + limit - 1);
 
         const { data, error } = await query;
         if (error) throw error;
 
-        return NextResponse.json({ events: data });
+        return NextResponse.json({ events: data, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching events:", error);
         return NextResponse.json(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useMarketplaceListings } from "@/hooks/useMarketplaceListings";
@@ -14,6 +14,7 @@ import {
 import type { MarketplaceListing } from "@/types/ticket";
 import { ChainFilter } from "@/components/ui/ChainFilter";
 import { StyledSelect } from "@/components/ui/StyledSelect";
+import { Pagination, PageSizeSelector } from "@/components/ui/Pagination";
 
 const SORT_OPTIONS = [
     { value: "newest", label: "Newest First" },
@@ -28,12 +29,19 @@ export default function MarketplacePage() {
     const { switchChainAsync } = useSwitchChain();
     const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
     const [sortBy, setSortBy] = useState("newest");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(6);
 
     // Get listings from database (not blockchain)
-    const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active", chainId: selectedChainId });
+    const { listings, eventInfoMap, isLoading, error, refetch, totalPages } = useMarketplaceListings({ status: "active", chainId: selectedChainId, page: currentPage, pageSize });
 
     // Only use blockchain hook for write operations
     const { buyTicket, cancelListing } = useMarketplace();
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedChainId]);
 
     const [processingListingId, setProcessingListingId] = useState<bigint | null>(null);
 
@@ -218,6 +226,7 @@ export default function MarketplacePage() {
                             onChange={setSortBy}
                             options={SORT_OPTIONS}
                         />
+                        <PageSizeSelector pageSize={pageSize} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
                         <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                     </div>
                 </div>
@@ -259,16 +268,19 @@ export default function MarketplacePage() {
 
                 {/* Listings Grid */}
                 {(isLoading || listings.length > 0) && (
-                    <ListingGrid
-                        listings={listings}
-                        eventInfoMap={eventInfoMap}
-                        isLoading={isLoading}
-                        currentUserAddress={address}
-                        onBuy={handleBuyClick}
-                        onCancel={handleCancelListing}
-                        processingListingId={processingListingId}
-                        sortBy={sortBy}
-                    />
+                    <>
+                        <ListingGrid
+                            listings={listings}
+                            eventInfoMap={eventInfoMap}
+                            isLoading={isLoading}
+                            currentUserAddress={address}
+                            onBuy={handleBuyClick}
+                            onCancel={handleCancelListing}
+                            processingListingId={processingListingId}
+                            sortBy={sortBy}
+                        />
+                        {!isLoading && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
+                    </>
                 )}
             </div>
 

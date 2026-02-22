@@ -52,15 +52,18 @@ interface UseTicketsFromDBOptions {
     isListed?: boolean | null; // true = listed only, false = unlisted only, null/undefined = all
     autoFetch?: boolean;
     chainId?: number | null;
+    page?: number;
+    pageSize?: number;
 }
 
 export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
-    const { owner, eventContract, isListed, autoFetch = true, chainId } = options;
+    const { owner, eventContract, isListed, autoFetch = true, chainId, page = 1, pageSize = 12 } = options;
 
     const [tickets, setTickets] = useState<UserTicketFromDB[]>([]);
     const [rawTickets, setRawTickets] = useState<DBTicket[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<AppError | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     const fetchTickets = useCallback(async () => {
         if (!owner) {
@@ -80,6 +83,8 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
                 params.set("is_listed", isListed.toString());
             }
             if (chainId) params.set("chain_id", String(chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/tickets?${params.toString()}`);
 
@@ -89,6 +94,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
 
             const data = await response.json();
             const dbTickets: DBTicket[] = data.tickets || [];
+            setTotalCount(data.totalCount ?? dbTickets.length);
 
             setRawTickets(dbTickets);
 
@@ -134,7 +140,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
         } finally {
             setIsLoading(false);
         }
-    }, [owner, eventContract, isListed, chainId]);
+    }, [owner, eventContract, isListed, chainId, page, pageSize]);
 
     useEffect(() => {
         if (autoFetch) {
@@ -148,5 +154,7 @@ export function useTicketsFromDB(options: UseTicketsFromDBOptions) {
         isLoading,
         error,
         refetch: fetchTickets,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

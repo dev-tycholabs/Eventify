@@ -43,15 +43,18 @@ interface UseTransactionsFromDBOptions {
     eventContract?: string;
     autoFetch?: boolean;
     chainId?: number | null;
+    page?: number;
+    pageSize?: number;
 }
 
 export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
-    const { user, txType, eventContract, autoFetch = true, chainId } = options;
+    const { user, txType, eventContract, autoFetch = true, chainId, page = 1, pageSize = 12 } = options;
 
     const [transactions, setTransactions] = useState<TransactionFromDB[]>([]);
     const [rawTransactions, setRawTransactions] = useState<DBTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<AppError | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     const fetchTransactions = useCallback(async () => {
         if (!user) {
@@ -69,6 +72,8 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
             if (txType) params.set("type", txType);
             if (eventContract) params.set("event_contract", eventContract);
             if (chainId) params.set("chain_id", String(chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/transactions?${params.toString()}`);
 
@@ -78,6 +83,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
 
             const data = await response.json();
             const dbTransactions: DBTransaction[] = data.transactions || [];
+            setTotalCount(data.totalCount ?? dbTransactions.length);
 
             setRawTransactions(dbTransactions);
 
@@ -116,7 +122,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
         } finally {
             setIsLoading(false);
         }
-    }, [user, txType, eventContract, chainId]);
+    }, [user, txType, eventContract, chainId, page, pageSize]);
 
     useEffect(() => {
         if (autoFetch) {
@@ -130,5 +136,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
         isLoading,
         error,
         refetch: fetchTransactions,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

@@ -10,6 +10,7 @@ import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
 import { useChainConfig } from "@/hooks/useChainConfig";
 import { ChainFilter } from "@/components/ui/ChainFilter";
+import { Pagination, PageSizeSelector } from "@/components/ui/Pagination";
 import type { Tables } from "@/lib/supabase/types";
 
 type Event = Tables<"events">;
@@ -19,11 +20,14 @@ export default function MyEventsPage() {
     const { address, isConnected } = useAccount();
     const { getEvents, deleteDraft } = useSupabase();
     const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(6);
     const {
         organizerEvents,
         isLoading: isLoadingOnChain,
-        refetch: refetchOnChain
-    } = useOrganizerEventsFromDB({ chainId: selectedChainId });
+        refetch: refetchOnChain,
+        totalPages,
+    } = useOrganizerEventsFromDB({ chainId: selectedChainId, page: currentPage, pageSize });
     const { writeContractAsync } = useWriteContract();
     const { currencySymbol } = useChainConfig();
     const publicClient = usePublicClient();
@@ -166,7 +170,8 @@ export default function MyEventsPage() {
                             {viewMode === "drafts" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />}
                         </button>
                     </div>
-                    <div className="pb-3">
+                    <div className="flex items-center gap-3 pb-3">
+                        <PageSizeSelector pageSize={pageSize} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
                         <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                     </div>
                 </div>
@@ -208,11 +213,14 @@ export default function MyEventsPage() {
                         )}
 
                         {!isLoadingOnChain && organizerEvents.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {organizerEvents.map((event) => (
-                                    <EventManageCard key={event.contractAddress} event={event} onManage={() => handleManageEvent(event)} onWithdraw={() => handleWithdraw(event)} />
-                                ))}
-                            </div>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {organizerEvents.map((event) => (
+                                        <EventManageCard key={event.contractAddress} event={event} onManage={() => handleManageEvent(event)} onWithdraw={() => handleWithdraw(event)} />
+                                    ))}
+                                </div>
+                                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                            </>
                         )}
                     </>
                 )}

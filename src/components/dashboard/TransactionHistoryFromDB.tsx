@@ -1,17 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { formatEther } from "viem";
-import { useTransactionsFromDB, type TransactionFromDB } from "@/hooks/useTransactionsFromDB";
+import { useTransactionsFromDB } from "@/hooks/useTransactionsFromDB";
 import { getNativeCurrencySymbol, getExplorerUrl } from "@/config/chains";
 import type { TransactionType } from "@/lib/supabase/types";
+import { Pagination } from "@/components/ui/Pagination";
 
 interface TransactionHistoryFromDBProps {
     address: `0x${string}`;
     chainId?: number | null;
+    pageSize?: number;
 }
 
-export function TransactionHistoryFromDB({ address, chainId }: TransactionHistoryFromDBProps) {
-    const { transactions, isLoading } = useTransactionsFromDB({ user: address, chainId });
+export function TransactionHistoryFromDB({ address, chainId, pageSize = 6 }: TransactionHistoryFromDBProps) {
+    const [currentPage, setCurrentPage] = useState(1);
+    const { transactions, isLoading, totalPages } = useTransactionsFromDB({ user: address, chainId, page: currentPage, pageSize });
 
     const getTypeIcon = (type: TransactionType) => {
         switch (type) {
@@ -185,6 +189,7 @@ export function TransactionHistoryFromDB({ address, chainId }: TransactionHistor
                     </div>
                 </div>
             ))}
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
     );
 }

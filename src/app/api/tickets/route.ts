@@ -75,6 +75,19 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
+        // Get total count with same filters
+        const countQuery = supabase
+            .from("user_tickets")
+            .select("id", { count: "exact", head: true })
+            .eq("owner_address", owner.toLowerCase());
+
+        if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
+        if (chainId) countQuery.eq("chain_id", chainId);
+        if (isListed === "true") countQuery.eq("is_listed", true);
+        else if (isListed === "false") countQuery.eq("is_listed", false);
+
+        const { count: totalCount } = await countQuery;
+
         const typedTickets = (tickets || []) as TicketWithEvent[];
 
         // For listed tickets, fetch their listing prices
@@ -104,7 +117,7 @@ export async function GET(request: NextRequest) {
             marketplace_listings: t.listing_id ? listingsMap[t.listing_id] || null : null,
         }));
 
-        return NextResponse.json({ tickets: ticketsWithListings });
+        return NextResponse.json({ tickets: ticketsWithListings, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching tickets:", error);
         return NextResponse.json(

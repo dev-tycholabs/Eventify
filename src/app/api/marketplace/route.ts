@@ -56,7 +56,23 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
-        return NextResponse.json({ listings: data });
+        // Get total count with same filters
+        const countQuery = supabase
+            .from("marketplace_listings")
+            .select("id", { count: "exact", head: true });
+
+        if (status) {
+            countQuery.eq("status", status);
+        } else {
+            countQuery.eq("status", "active");
+        }
+        if (seller) countQuery.eq("seller_address", seller.toLowerCase());
+        if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
+        if (chainId) countQuery.eq("chain_id", chainId);
+
+        const { count: totalCount } = await countQuery;
+
+        return NextResponse.json({ listings: data, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching marketplace listings:", error);
         return NextResponse.json(

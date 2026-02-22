@@ -8,6 +8,7 @@ import { useChainConfig } from "@/hooks/useChainConfig";
 import { syncListing, syncTicket, syncTransaction, findEventIdByContract } from "@/lib/api/sync";
 import { TicketCard } from "./TicketCard";
 import { ListTicketModal, TransferTicketModal } from "@/components/marketplace";
+import { Pagination } from "@/components/ui/Pagination";
 
 interface UserTicket {
     tokenId: bigint;
@@ -30,9 +31,10 @@ interface TicketGalleryFromDBProps {
     address: `0x${string}`;
     filter?: "all" | "unlisted" | "listed";
     chainId?: number | null;
+    pageSize?: number;
 }
 
-export function TicketGalleryFromDB({ address, filter = "all", chainId }: TicketGalleryFromDBProps) {
+export function TicketGalleryFromDB({ address, filter = "all", chainId, pageSize = 6 }: TicketGalleryFromDBProps) {
     const router = useRouter();
     const { chainId: walletChainId } = useChainConfig();
     const [listingTicket, setListingTicket] = useState<UserTicket | null>(null);
@@ -41,15 +43,18 @@ export function TicketGalleryFromDB({ address, filter = "all", chainId }: Ticket
     const [isTransferLoading, setIsTransferLoading] = useState(false);
     const [cancellingTicketId, setCancellingTicketId] = useState<string | null>(null);
     const [maxResalePrice, setMaxResalePrice] = useState<bigint | undefined>(undefined);
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Convert filter to isListed parameter for backend
     const isListedFilter = filter === "listed" ? true : filter === "unlisted" ? false : null;
 
     // Fetch tickets from database with filter
-    const { tickets: dbTickets, isLoading, refetch: refetchTickets } = useTicketsFromDB({
+    const { tickets: dbTickets, isLoading, refetch: refetchTickets, totalPages } = useTicketsFromDB({
         owner: address,
         isListed: isListedFilter,
         chainId,
+        page: currentPage,
+        pageSize,
     });
 
     const { listTicket, cancelListing, transferTicket: transferTicketOnChain } = useMarketplace();
@@ -271,6 +276,8 @@ export function TicketGalleryFromDB({ address, filter = "all", chainId }: Ticket
                     );
                 })}
             </div>
+
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
             {/* List Ticket Modal */}
             <ListTicketModal

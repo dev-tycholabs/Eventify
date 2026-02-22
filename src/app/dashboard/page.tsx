@@ -6,6 +6,7 @@ import { TicketGalleryFromDB } from "@/components/dashboard/TicketGalleryFromDB"
 import { TransactionHistoryFromDB } from "@/components/dashboard/TransactionHistoryFromDB";
 import { ChainFilter } from "@/components/ui/ChainFilter";
 import { StyledSelect } from "@/components/ui/StyledSelect";
+import { PageSizeSelector } from "@/components/ui/Pagination";
 
 type TabType = "tickets" | "history";
 type TicketFilter = "all" | "unlisted" | "listed";
@@ -21,6 +22,7 @@ export default function DashboardPage() {
     const [activeTab, setActiveTab] = useState<TabType>("tickets");
     const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
     const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [pageSize, setPageSize] = useState(6);
 
     // Protected route - require wallet connection
     if (!isConnected) {
@@ -98,6 +100,7 @@ export default function DashboardPage() {
                     {/* Filter Dropdown - Only show on tickets tab */}
                     {activeTab === "tickets" && (
                         <div className="flex items-center gap-3 pb-3">
+                            <PageSizeSelector pageSize={pageSize} onPageSizeChange={setPageSize} />
                             <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                             <StyledSelect
                                 value={ticketFilter}
@@ -107,7 +110,8 @@ export default function DashboardPage() {
                         </div>
                     )}
                     {activeTab === "history" && (
-                        <div className="pb-3">
+                        <div className="flex items-center gap-3 pb-3">
+                            <PageSizeSelector pageSize={pageSize} onPageSizeChange={setPageSize} />
                             <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                         </div>
                     )}
@@ -115,9 +119,9 @@ export default function DashboardPage() {
 
                 {/* Tab Content */}
                 {activeTab === "tickets" ? (
-                    <TicketGalleryFromDB address={address!} filter={ticketFilter} chainId={selectedChainId} />
+                    <TicketGalleryFromDB address={address!} filter={ticketFilter} chainId={selectedChainId} pageSize={pageSize} />
                 ) : (
-                    <TransactionHistoryFromDB address={address!} chainId={selectedChainId} />
+                    <TransactionHistoryFromDB address={address!} chainId={selectedChainId} pageSize={pageSize} />
                 )}
             </div>
         </div>
