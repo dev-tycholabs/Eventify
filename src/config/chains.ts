@@ -1,67 +1,4 @@
-import { defineChain } from "viem";
-import { sepolia, avalancheFuji, polygonAmoy, baseSepolia, optimismSepolia } from "viem/chains";
-
-// ─── Custom chain definitions ───────────────────────────────────────────────
-
-export const etherlinkTestnet = defineChain({
-    id: 128123,
-    name: "Etherlink Testnet",
-    nativeCurrency: {
-        decimals: 18,
-        name: "XTZ",
-        symbol: "XTZ",
-    },
-    rpcUrls: {
-        default: { http: ["https://node.ghostnet.etherlink.com"] },
-    },
-    blockExplorers: {
-        default: {
-            name: "Etherlink Explorer",
-            url: "https://testnet.explorer.etherlink.com",
-        },
-    },
-    testnet: true,
-});
-
-export const etherlinkShadownet = defineChain({
-    id: 127823,
-    name: "Etherlink Shadownet",
-    nativeCurrency: {
-        decimals: 18,
-        name: "XTZ",
-        symbol: "XTZ",
-    },
-    rpcUrls: {
-        default: { http: ["https://rpc.ankr.com/etherlink_shadownet_testnet/2135afba8b48f4f1701817fbf369fd1388798385298a736c0009a1dccd638770"] },
-    },
-    blockExplorers: {
-        default: {
-            name: "Shadownet Explorer",
-            url: "https://shadownet.explorer.etherlink.com",
-        },
-    },
-    testnet: true,
-});
-
-export const unichainSepolia = defineChain({
-    id: 1301,
-    name: "Unichain Sepolia",
-    nativeCurrency: {
-        decimals: 18,
-        name: "Ether",
-        symbol: "ETH",
-    },
-    rpcUrls: {
-        default: { http: ["https://sepolia.unichain.org"] },
-    },
-    blockExplorers: {
-        default: {
-            name: "Unichain Explorer",
-            url: "https://sepolia.uniscan.xyz",
-        },
-    },
-    testnet: true,
-});
+import { sepolia, avalancheFuji, polygonAmoy, baseSepolia, optimismSepolia, etherlinkShadownetTestnet, unichainSepolia } from "viem/chains";
 
 // ─── Per-chain contract addresses ───────────────────────────────────────────
 
@@ -76,7 +13,7 @@ export interface ChainContracts {
 // Add entries here as you deploy contracts to new chains
 export const CHAIN_CONTRACTS: Record<number, ChainContracts> = {
     // Etherlink Shadownet (current deployment)
-    [etherlinkShadownet.id]: {
+    [etherlinkShadownetTestnet.id]: {
         EventFactory: "0x6885809b6894B8Dfa5BA92f01fEd1031E96007Ae",
         TicketMarketplace: "0xFBC5f575A39D97a15545F095B92fA23BAa3ea075",
         Registry: "0xDb3B9b7AC97D51D825aA43733D3f4aA49fe8B4Da",
@@ -136,7 +73,7 @@ export const CHAIN_CONTRACTS: Record<number, ChainContracts> = {
 // ─── Supported chains list (order = display order in wallet switcher) ───────
 
 export const SUPPORTED_CHAINS = [
-    etherlinkShadownet,
+    etherlinkShadownetTestnet,
     sepolia,
     avalancheFuji,
     polygonAmoy,
