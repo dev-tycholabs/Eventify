@@ -1,0 +1,17 @@
+{
+  "network": "avalancheFuji",
+  "chainId": 43113,
+  "deployer": "0x0b310BAb859B4d3D37084dD6A32f03389618B605",
+  "contracts": {
+    "Registry": "0xa0FfD7DAE3c011E737fc1326cACD1b784278A721",
+    "TicketMarketplace": "0x053E1951307B0f9f87E6054E87754D877306386c",
+    "RoyaltySplitter": "0x408DfB52e37539C639618BC28AeBD933E878ef77",
+    "EventFactory": "0x167582d206972f9b053D3e9Ec2CFA945Ab2b5bf6"
+  },
+  "config": {
+    "platformFeePercent": 2.5,
+    "defaultRoyaltyPercent": 5,
+    "maxResalePricePercent": 110
+  },
+  "deployedAt": "2026-02-23T16:20:49.091Z"
+}

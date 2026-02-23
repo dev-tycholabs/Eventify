@@ -105,6 +105,11 @@ Eventify is chain-agnostic — deploy the same contract suite to any EVM chain a
 |---|---|---|---|
 | Etherlink Shadownet | 127823 | XTZ | ✅ Deployed |
 | Ethereum Sepolia | 11155111 | ETH | ✅ Deployed |
+| Avalanche Fuji | 43113 | AVAX | ✅ Deployed |
+| Polygon Amoy | 80002 | POL | ✅ Deployed |
+| Base Sepolia | 84532 | ETH | ✅ Deployed |
+| Optimism Sepolia | 11155420 | ETH | ✅ Deployed |
+| Unichain Sepolia | 1301 | ETH | ✅ Deployed |
 | Etherlink Testnet | 128123 | XTZ | Configured |
 | Etherlink Mainnet | 42793 | XTZ | Ready |
 

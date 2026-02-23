@@ -1,0 +1,17 @@
+{
+  "network": "polygonAmoy",
+  "chainId": 80002,
+  "deployer": "0x0b310BAb859B4d3D37084dD6A32f03389618B605",
+  "contracts": {
+    "Registry": "0x322eC36AD2F8257cc312d0Cc9550afB6eD9e945A",
+    "TicketMarketplace": "0xa0FfD7DAE3c011E737fc1326cACD1b784278A721",
+    "RoyaltySplitter": "0x053E1951307B0f9f87E6054E87754D877306386c",
+    "EventFactory": "0x408DfB52e37539C639618BC28AeBD933E878ef77"
+  },
+  "config": {
+    "platformFeePercent": 2.5,
+    "defaultRoyaltyPercent": 5,
+    "maxResalePricePercent": 110
+  },
+  "deployedAt": "2026-02-23T17:46:48.068Z"
+}

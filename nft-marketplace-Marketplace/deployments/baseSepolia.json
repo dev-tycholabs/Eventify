@@ -1,0 +1,17 @@
+{
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deployer": "0x0b310BAb859B4d3D37084dD6A32f03389618B605",
+  "contracts": {
+    "Registry": "0xF653f0cA2205366283Ce28f0CE2018b47D8A9995",
+    "TicketMarketplace": "0x1F350D999Db98BF7DCb51b231ef992AeBA8aacAA",
+    "RoyaltySplitter": "0x7a7365b0709de89d1Cf8fEB11BC0Aa8207486204",
+    "EventFactory": "0x8aB53d30Db4043f4ee0f43564B6595B3D3BC092E"
+  },
+  "config": {
+    "platformFeePercent": 2.5,
+    "defaultRoyaltyPercent": 5,
+    "maxResalePricePercent": 110
+  },
+  "deployedAt": "2026-02-23T18:00:33.132Z"
+}

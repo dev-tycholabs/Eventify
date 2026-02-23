@@ -1,5 +1,5 @@
 import { defineChain } from "viem";
-import { sepolia } from "viem/chains";
+import { sepolia, avalancheFuji, polygonAmoy, baseSepolia, optimismSepolia } from "viem/chains";
 
 // ─── Custom chain definitions ───────────────────────────────────────────────
 
@@ -43,6 +43,26 @@ export const etherlinkShadownet = defineChain({
     testnet: true,
 });
 
+export const unichainSepolia = defineChain({
+    id: 1301,
+    name: "Unichain Sepolia",
+    nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH",
+    },
+    rpcUrls: {
+        default: { http: ["https://sepolia.unichain.org"] },
+    },
+    blockExplorers: {
+        default: {
+            name: "Unichain Explorer",
+            url: "https://sepolia.uniscan.xyz",
+        },
+    },
+    testnet: true,
+});
+
 // ─── Per-chain contract addresses ───────────────────────────────────────────
 
 export interface ChainContracts {
@@ -76,6 +96,41 @@ export const CHAIN_CONTRACTS: Record<number, ChainContracts> = {
         Registry: "0xC1478b5dfb5D04B6FcdD0FF5c4ef366c80A3A424",
         RoyaltySplitterImpl: "0xDE542c4b4A961f91DAB6723Eb2F67124D2EEdA9C",
     },
+    // Avalanche Fuji
+    [avalancheFuji.id]: {
+        EventFactory: "0x167582d206972f9b053D3e9Ec2CFA945Ab2b5bf6",
+        TicketMarketplace: "0x053E1951307B0f9f87E6054E87754D877306386c",
+        Registry: "0xa0FfD7DAE3c011E737fc1326cACD1b784278A721",
+        RoyaltySplitterImpl: "0x408DfB52e37539C639618BC28AeBD933E878ef77",
+    },
+    // Polygon Amoy
+    [polygonAmoy.id]: {
+        EventFactory: "0x408DfB52e37539C639618BC28AeBD933E878ef77",
+        TicketMarketplace: "0xa0FfD7DAE3c011E737fc1326cACD1b784278A721",
+        Registry: "0x322eC36AD2F8257cc312d0Cc9550afB6eD9e945A",
+        RoyaltySplitterImpl: "0x053E1951307B0f9f87E6054E87754D877306386c",
+    },
+    // Base Sepolia
+    [baseSepolia.id]: {
+        EventFactory: "0x8aB53d30Db4043f4ee0f43564B6595B3D3BC092E",
+        TicketMarketplace: "0x1F350D999Db98BF7DCb51b231ef992AeBA8aacAA",
+        Registry: "0xF653f0cA2205366283Ce28f0CE2018b47D8A9995",
+        RoyaltySplitterImpl: "0x7a7365b0709de89d1Cf8fEB11BC0Aa8207486204",
+    },
+    // Optimism Sepolia
+    [optimismSepolia.id]: {
+        EventFactory: "0x64fFDeE582187975b84E7Bba189D380D2289Dd6E",
+        TicketMarketplace: "0x403D7d92024Cb6Be2Ff71866B635FBB086a789b3",
+        Registry: "0x94160b094d53357180Fe952F2083C8247200c978",
+        RoyaltySplitterImpl: "0x9Acd700c94d91D9155d1EE3b6cd21f31D0b6D244",
+    },
+    // Unichain Sepolia
+    [unichainSepolia.id]: {
+        EventFactory: "0x64fFDeE582187975b84E7Bba189D380D2289Dd6E",
+        TicketMarketplace: "0x403D7d92024Cb6Be2Ff71866B635FBB086a789b3",
+        Registry: "0x94160b094d53357180Fe952F2083C8247200c978",
+        RoyaltySplitterImpl: "0x9Acd700c94d91D9155d1EE3b6cd21f31D0b6D244",
+    },
 };
 
 // ─── Supported chains list (order = display order in wallet switcher) ───────
@@ -83,10 +138,13 @@ export const CHAIN_CONTRACTS: Record<number, ChainContracts> = {
 export const SUPPORTED_CHAINS = [
     etherlinkShadownet,
     sepolia,
+    avalancheFuji,
+    polygonAmoy,
+    baseSepolia,
+    optimismSepolia,
+    unichainSepolia,
     // Uncomment as you deploy contracts:
     // etherlinkTestnet,
-    // baseSepolia,
-    // arbitrumSepolia,
 ] as const;
 
 // Default chain (first in the list)

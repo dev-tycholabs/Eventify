@@ -51,6 +51,41 @@ module.exports = {
       chainId: 11155111,
       timeout: 60000,
     },
+    // Avalanche Fuji Testnet
+    avalancheFuji: {
+      url: "https://avalanche-fuji.drpc.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 43113,
+      timeout: 60000,
+    },
+    // Polygon Amoy Testnet
+    polygonAmoy: {
+      url: "https://rpc-amoy.polygon.technology",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 80002,
+      timeout: 60000,
+    },
+    // Base Sepolia Testnet
+    baseSepolia: {
+      url: "https://sepolia.base.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 84532,
+      timeout: 60000,
+    },
+    // Optimism Sepolia Testnet
+    optimismSepolia: {
+      url: "https://sepolia.optimism.io",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 11155420,
+      timeout: 60000,
+    },
+    // Unichain Sepolia Testnet
+    unichainSepolia: {
+      url: "https://sepolia.unichain.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : `0x${process.env.PRIVATE_KEY}`] : [],
+      chainId: 1301,
+      timeout: 60000,
+    },
     // Etherlink Mainnet
     etherlink: {
       url: "https://node.mainnet.etherlink.com",

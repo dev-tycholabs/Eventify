@@ -14,6 +14,9 @@ async function main() {
   console.log("Deploying contracts with account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
+  // Wait for extra confirmations on public RPCs to avoid nonce race conditions
+  const CONFIRMATIONS = hre.network.name === "hardhat" ? 1 : 2;
+
   // ============================================
   // 1. Deploy Registry
   // ============================================
@@ -25,7 +28,7 @@ async function main() {
     250,              // feeNumerator - 2.5% fee
     10000             // feeScale - basis points
   );
-  await registry.deployed();
+  await registry.deployTransaction.wait(CONFIRMATIONS);
 
   console.log(`✅ Registry deployed to: ${registry.address}`);
 
@@ -36,7 +39,7 @@ async function main() {
 
   const TicketMarketplace = await hre.ethers.getContractFactory("TicketMarketplace");
   const marketplace = await TicketMarketplace.deploy(registry.address);
-  await marketplace.deployed();
+  await marketplace.deployTransaction.wait(CONFIRMATIONS);
 
   console.log(`✅ TicketMarketplace deployed to: ${marketplace.address}`);
 
@@ -47,7 +50,7 @@ async function main() {
 
   const RoyaltySplitter = await hre.ethers.getContractFactory("RoyaltySplitter");
   const splitterImpl = await RoyaltySplitter.deploy();
-  await splitterImpl.deployed();
+  await splitterImpl.deployTransaction.wait(CONFIRMATIONS);
 
   console.log(`✅ RoyaltySplitter implementation deployed to: ${splitterImpl.address}`);
 
@@ -63,7 +66,7 @@ async function main() {
     110,                // defaultMaxResalePercent - 110% max resale price
     splitterImpl.address // splitterImplementation for cloning
   );
-  await factory.deployed();
+  await factory.deployTransaction.wait(CONFIRMATIONS);
 
   console.log(`✅ EventFactory deployed to: ${factory.address}`);
 
@@ -74,17 +77,17 @@ async function main() {
 
   // Approve TicketMarketplace
   let tx = await registry.setContractStatus(marketplace.address, true);
-  await tx.wait();
+  await tx.wait(CONFIRMATIONS);
   console.log("   ✓ TicketMarketplace approved in Registry");
 
   // Approve EventFactory
   tx = await registry.setContractStatus(factory.address, true);
-  await tx.wait();
+  await tx.wait(CONFIRMATIONS);
   console.log("   ✓ EventFactory approved in Registry");
 
   // Transfer Registry ownership to EventFactory so it can register new event contracts
   tx = await registry.transferOwnership(factory.address);
-  await tx.wait();
+  await tx.wait(CONFIRMATIONS);
   console.log("   ✓ Registry ownership transferred to EventFactory");
 
   // ============================================
