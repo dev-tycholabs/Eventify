@@ -23,14 +23,15 @@ export interface ChainBalance {
 }
 
 // Cache public clients per chain
-const clientCache = new Map<number, ReturnType<typeof createPublicClient>>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const clientCache = new Map<number, any>();
 
 function getClient(chainId: number) {
     if (clientCache.has(chainId)) return clientCache.get(chainId)!;
     const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
     if (!chain) return null;
     const client = createPublicClient({ chain, transport: http() });
-    clientCache.set(chainId, client);
+    clientCache.set(chainId, client as any);
     return client;
 }
 
