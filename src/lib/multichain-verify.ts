@@ -13,9 +13,11 @@ export interface MultiChainVerifyResult {
 }
 
 // Cache public clients so we don't recreate them on every call
-const clientCache = new Map<number, PublicClient>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const clientCache = new Map<number, any>();
 
-function getPublicClient(chainId: number): PublicClient | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPublicClient(chainId: number): any {
     if (clientCache.has(chainId)) return clientCache.get(chainId)!;
 
     const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
