@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
         const tokenId = searchParams.get("token_id");
         const txType = searchParams.get("type") as TransactionType | null;
         const eventContract = searchParams.get("event_contract");
+        const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
         const limit = parseInt(searchParams.get("limit") || "50");
         const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -56,11 +57,31 @@ export async function GET(request: NextRequest) {
             query = query.eq("tx_type", txType);
         }
 
+        if (chainId) {
+            query = query.eq("chain_id", chainId);
+        }
+
         const { data, error } = await query;
 
         if (error) throw error;
 
-        return NextResponse.json({ transactions: data });
+        // Get total count with same filters
+        const countQuery = supabase
+            .from("transactions")
+            .select("id", { count: "exact", head: true });
+
+        if (tokenId && eventContract) {
+            countQuery.eq("token_id", tokenId).eq("event_contract_address", eventContract.toLowerCase());
+        } else if (user) {
+            countQuery.eq("user_address", user.toLowerCase());
+            if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
+        }
+        if (txType) countQuery.eq("tx_type", txType);
+        if (chainId) countQuery.eq("chain_id", chainId);
+
+        const { count: totalCount } = await countQuery;
+
+        return NextResponse.json({ transactions: data, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching transactions:", error);
         return NextResponse.json(
@@ -87,11 +108,12 @@ export async function POST(request: NextRequest) {
             to_address,
             block_number,
             tx_timestamp,
+            chain_id,
         } = body;
 
-        if (!tx_hash || !tx_type || !user_address || !tx_timestamp) {
+        if (!tx_hash || !tx_type || !user_address || !tx_timestamp || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields" },
+                { error: "Missing required fields (tx_hash, tx_type, user_address, tx_timestamp, chain_id)" },
                 { status: 400 }
             );
         }
@@ -99,6 +121,7 @@ export async function POST(request: NextRequest) {
         const supabase = createServerClient();
 
         const insertData: InsertTables<"transactions"> = {
+            chain_id: chain_id as number,
             tx_hash,
             tx_type: tx_type as TransactionType,
             user_address: user_address.toLowerCase(),
@@ -116,7 +139,7 @@ export async function POST(request: NextRequest) {
         const { data, error } = await supabase
             .from("transactions")
             .upsert(insertData, {
-                onConflict: "tx_hash,tx_type,user_address",
+                onConflict: "chain_id,tx_hash,tx_type,user_address",
             })
             .select()
             .single();

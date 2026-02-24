@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useAccount, usePublicClient } from "wagmi";
+import { useAccount } from "wagmi";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import type { Tables } from "@/lib/supabase/types";
 
 type Event = Tables<"events">;
@@ -9,6 +11,7 @@ type Event = Tables<"events">;
 export interface OrganizerEventFromDB {
     id: string;
     contractAddress: `0x${string}`;
+    chainId: number;
     name: string;
     venue: string;
     date: Date;
@@ -23,14 +26,17 @@ export interface OrganizerEventFromDB {
     eventType: string;
 }
 
-export function useOrganizerEventsFromDB() {
+export function useOrganizerEventsFromDB(options: { chainId?: number | null; page?: number; pageSize?: number } = {}) {
     const [isLoading, setIsLoading] = useState(false);
     const [organizerEvents, setOrganizerEvents] = useState<OrganizerEventFromDB[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const { address, isConnected } = useAccount();
-    const publicClient = usePublicClient();
+
+    const page = options.page ?? 1;
+    const pageSize = options.pageSize ?? 12;
 
     const fetchOrganizerEvents = useCallback(async () => {
-        if (!address || !publicClient) {
+        if (!address) {
             setOrganizerEvents([]);
             return;
         }
@@ -38,15 +44,22 @@ export function useOrganizerEventsFromDB() {
         setIsLoading(true);
         try {
             // Fetch published events from Supabase API
-            const response = await fetch(
-                `/api/events?organizer=${address}&status=published`
-            );
+            const params = new URLSearchParams();
+            params.set("organizer", address);
+            params.set("status", "published");
+            if (options.chainId) params.set("chain_id", String(options.chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
+
+            const response = await fetch(`/api/events?${params.toString()}`);
 
             if (!response.ok) {
                 throw new Error("Failed to fetch events");
             }
 
-            const { events } = await response.json() as { events: Event[] };
+            const responseData = await response.json() as { events: Event[]; totalCount?: number };
+            const events = responseData.events;
+            setTotalCount(responseData.totalCount ?? events.length);
 
             if (!events || events.length === 0) {
                 setOrganizerEvents([]);
@@ -59,13 +72,17 @@ export function useOrganizerEventsFromDB() {
                     .filter((event) => event.contract_address) // Only events with contract
                     .map(async (event) => {
                         const contractAddress = event.contract_address as `0x${string}`;
+                        const eventChainId = event.chain_id as number;
 
-                        // Single blockchain call per event
+                        // Get public client for the specific blockchain
                         let balance = BigInt(0);
                         try {
-                            balance = await publicClient.getBalance({ address: contractAddress });
+                            const chainPublicClient = getPublicClient(config, { chainId: eventChainId });
+                            if (chainPublicClient) {
+                                balance = await chainPublicClient.getBalance({ address: contractAddress });
+                            }
                         } catch (err) {
-                            console.error(`Failed to fetch balance for ${contractAddress}:`, err);
+                            console.error(`Failed to fetch balance for ${contractAddress} on chain ${eventChainId}:`, err);
                         }
 
                         const totalSupply = event.total_supply || 0;
@@ -74,6 +91,7 @@ export function useOrganizerEventsFromDB() {
                         return {
                             id: event.id,
                             contractAddress,
+                            chainId: eventChainId,
                             name: event.name,
                             venue: event.venue || "",
                             date: event.date ? new Date(event.date) : new Date(),
@@ -96,7 +114,7 @@ export function useOrganizerEventsFromDB() {
         } finally {
             setIsLoading(false);
         }
-    }, [address, publicClient]);
+    }, [address, options.chainId, page, pageSize]);
 
     useEffect(() => {
         if (isConnected && address) {
@@ -112,5 +130,7 @@ export function useOrganizerEventsFromDB() {
         organizerEvents,
         isLoading,
         refetch,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

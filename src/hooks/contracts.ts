@@ -1,10 +1,9 @@
-// Contract addresses and ABIs for Etherlink Testnet
-export const CONTRACT_ADDRESSES = {
-    EventFactory: "0x6885809b6894B8Dfa5BA92f01fEd1031E96007Ae" as const,
-    TicketMarketplace: "0xFBC5f575A39D97a15545F095B92fA23BAa3ea075" as const,
-    Registry: "0xDb3B9b7AC97D51D825aA43733D3f4aA49fe8B4Da" as const,
-    RoyaltySplitterImpl: "0x9273391df6651941Fd02a674A5FB849e721F0094" as const,
-};
+// Contract addresses are now chain-aware — see src/config/chains.ts
+// Import getContractsForChain() or use the useChainConfig() hook instead.
+// This legacy export is kept for server-side code that needs a default.
+import { DEFAULT_CHAIN, getContractsForChain } from "@/config/chains";
+
+export const CONTRACT_ADDRESSES = getContractsForChain(DEFAULT_CHAIN.id)!;
 
 export const EventFactoryABI = [
     {

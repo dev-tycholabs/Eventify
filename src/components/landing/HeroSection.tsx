@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { SupportedChains } from "./SupportedChains";
 
 export function HeroSection() {
     return (
-        <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+        <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden pt-20">
             {/* Gradient Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent" />
@@ -49,6 +50,8 @@ export function HeroSection() {
                         Tycho Labs
                     </a>
                 </p>
+
+                <SupportedChains />
             </div>
 
             {/* Decorative Elements */}

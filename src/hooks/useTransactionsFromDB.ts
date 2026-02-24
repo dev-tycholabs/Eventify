@@ -18,6 +18,7 @@ export interface TransactionFromDB {
     id: string;
     txHash: string;
     txType: TransactionType;
+    chainId: number;
     userAddress: `0x${string}`;
     tokenId: string | null;
     eventContractAddress: `0x${string}` | null;
@@ -41,15 +42,19 @@ interface UseTransactionsFromDBOptions {
     txType?: TransactionType;
     eventContract?: string;
     autoFetch?: boolean;
+    chainId?: number | null;
+    page?: number;
+    pageSize?: number;
 }
 
 export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
-    const { user, txType, eventContract, autoFetch = true } = options;
+    const { user, txType, eventContract, autoFetch = true, chainId, page = 1, pageSize = 12 } = options;
 
     const [transactions, setTransactions] = useState<TransactionFromDB[]>([]);
     const [rawTransactions, setRawTransactions] = useState<DBTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<AppError | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     const fetchTransactions = useCallback(async () => {
         if (!user) {
@@ -66,6 +71,9 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
             params.set("user", user);
             if (txType) params.set("type", txType);
             if (eventContract) params.set("event_contract", eventContract);
+            if (chainId) params.set("chain_id", String(chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/transactions?${params.toString()}`);
 
@@ -75,6 +83,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
 
             const data = await response.json();
             const dbTransactions: DBTransaction[] = data.transactions || [];
+            setTotalCount(data.totalCount ?? dbTransactions.length);
 
             setRawTransactions(dbTransactions);
 
@@ -83,6 +92,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
                 id: t.id,
                 txHash: t.tx_hash,
                 txType: t.tx_type,
+                chainId: t.chain_id,
                 userAddress: t.user_address as `0x${string}`,
                 tokenId: t.token_id,
                 eventContractAddress: t.event_contract_address as `0x${string}` | null,
@@ -112,7 +122,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
         } finally {
             setIsLoading(false);
         }
-    }, [user, txType, eventContract]);
+    }, [user, txType, eventContract, chainId, page, pageSize]);
 
     useEffect(() => {
         if (autoFetch) {
@@ -126,5 +136,7 @@ export function useTransactionsFromDB(options: UseTransactionsFromDBOptions) {
         isLoading,
         error,
         refetch: fetchTransactions,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

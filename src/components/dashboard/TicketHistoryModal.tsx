@@ -2,9 +2,8 @@
 
 import { formatEther } from "viem";
 import { useTicketHistory, type TicketHistoryEntry } from "@/hooks/useTicketHistory";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import type { TransactionType } from "@/lib/supabase/types";
-
-const EXPLORER_URL = "https://shadownet.explorer.etherlink.com";
 
 interface TicketHistoryModalProps {
     isOpen: boolean;
@@ -26,6 +25,7 @@ export function TicketHistoryModal({
         eventContractAddress,
         enabled: isOpen,
     });
+    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
 
     const getTypeConfig = (type: TransactionType) => {
         switch (type) {
@@ -231,7 +231,7 @@ export function TicketHistoryModal({
 
                                                     {entry.amount && (
                                                         <p className="text-gray-400 text-sm">
-                                                            Price: <span className="text-white font-medium">{formatEther(entry.amount)} XTZ</span>
+                                                            Price: <span className="text-white font-medium">{formatEther(entry.amount)} {currencySymbol}</span>
                                                         </p>
                                                     )}
 

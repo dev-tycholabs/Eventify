@@ -18,12 +18,15 @@ type TicketWithEvent = Tables<"user_tickets"> & {
 };
 
 // GET /api/tickets/[contract]/[tokenId] - Get a single ticket by contract and tokenId
+// Optional query param: ?chain_id=... (needed when same contract exists on multiple chains)
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ contract: string; tokenId: string }> }
 ) {
     try {
         const { contract, tokenId } = await params;
+        const { searchParams } = new URL(request.url);
+        const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
 
         if (!contract || !tokenId) {
             return NextResponse.json(
@@ -34,7 +37,7 @@ export async function GET(
 
         const supabase = createServerClient();
 
-        const { data, error } = await supabase
+        let query = supabase
             .from("user_tickets")
             .select(`
                 *,
@@ -52,8 +55,13 @@ export async function GET(
                 )
             `)
             .eq("event_contract_address", contract.toLowerCase())
-            .eq("token_id", tokenId)
-            .single();
+            .eq("token_id", tokenId);
+
+        if (chainId) {
+            query = query.eq("chain_id", chainId);
+        }
+
+        const { data, error } = await query.single();
 
         if (error) {
             if (error.code === "PGRST116") {

@@ -42,6 +42,7 @@ CREATE UNIQUE INDEX idx_users_username_unique ON users(username) WHERE username 
 -- Events table
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chain_id INTEGER NOT NULL,
     contract_address TEXT,
     organizer_address TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -69,6 +70,7 @@ CREATE TABLE events (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+COMMENT ON COLUMN events.chain_id IS 'EVM chain ID where this event contract is deployed (e.g. 127823 = Etherlink Shadownet, 11155111 = Sepolia)';
 COMMENT ON COLUMN events.cover_image_url IS 'Wide banner image displayed at the top of the event page';
 COMMENT ON COLUMN events.royalty_splitter_address IS 'Address of the RoyaltySplitter clone contract deployed by EventFactory for this event';
 COMMENT ON COLUMN events.media_files IS 'Array of additional media files: [{url: string, type: "image"|"video"}]';
@@ -76,7 +78,8 @@ COMMENT ON COLUMN events.media_files IS 'Array of additional media files: [{url:
 -- Marketplace Listings table
 CREATE TABLE marketplace_listings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    listing_id TEXT NOT NULL UNIQUE,
+    chain_id INTEGER NOT NULL,
+    listing_id TEXT NOT NULL,
     token_id TEXT NOT NULL,
     event_contract_address TEXT NOT NULL,
     event_id UUID REFERENCES events(id) ON DELETE SET NULL,
@@ -89,12 +92,14 @@ CREATE TABLE marketplace_listings (
     cancelled_at TIMESTAMPTZ,
     tx_hash TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(chain_id, listing_id)
 );
 
 -- User Tickets table
 CREATE TABLE user_tickets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chain_id INTEGER NOT NULL,
     token_id TEXT NOT NULL,
     event_contract_address TEXT NOT NULL,
     event_id UUID REFERENCES events(id) ON DELETE SET NULL,
@@ -108,12 +113,13 @@ CREATE TABLE user_tickets (
     used_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(event_contract_address, token_id)
+    UNIQUE(chain_id, event_contract_address, token_id)
 );
 
 -- Transactions table
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chain_id INTEGER NOT NULL,
     tx_hash TEXT NOT NULL,
     tx_type transaction_type NOT NULL,
     user_address TEXT NOT NULL,
@@ -127,7 +133,7 @@ CREATE TABLE transactions (
     block_number TEXT,
     tx_timestamp TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(tx_hash, tx_type, user_address)
+    UNIQUE(chain_id, tx_hash, tx_type, user_address)
 );
 
 -- Royalty Recipients table
@@ -150,6 +156,7 @@ COMMENT ON COLUMN royalty_recipients.royalty_claimed IS 'Cumulative royalties ac
 -- Royalty Distributions table (immutable audit trail)
 CREATE TABLE royalty_distributions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chain_id INTEGER NOT NULL,
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     splitter_address TEXT NOT NULL,
     tx_hash TEXT NOT NULL,
@@ -200,12 +207,17 @@ CREATE INDEX idx_events_organizer ON events(organizer_address);
 CREATE INDEX idx_events_contract ON events(contract_address);
 CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_events_sold_count ON events(sold_count DESC);
+CREATE INDEX idx_events_chain ON events(chain_id);
+CREATE INDEX idx_events_chain_contract ON events(chain_id, contract_address);
+CREATE INDEX idx_events_chain_organizer ON events(chain_id, organizer_address);
 
 -- Marketplace Listings
 CREATE INDEX idx_marketplace_listings_seller ON marketplace_listings(seller_address);
 CREATE INDEX idx_marketplace_listings_status ON marketplace_listings(status);
 CREATE INDEX idx_marketplace_listings_event ON marketplace_listings(event_contract_address);
 CREATE INDEX idx_marketplace_listings_listing_id ON marketplace_listings(listing_id);
+CREATE INDEX idx_marketplace_listings_chain ON marketplace_listings(chain_id);
+CREATE INDEX idx_marketplace_listings_chain_status ON marketplace_listings(chain_id, status);
 
 -- User Tickets
 CREATE INDEX idx_user_tickets_owner ON user_tickets(owner_address);
@@ -213,12 +225,16 @@ CREATE INDEX idx_user_tickets_event ON user_tickets(event_contract_address);
 CREATE INDEX idx_user_tickets_token ON user_tickets(token_id);
 CREATE INDEX idx_user_tickets_is_used ON user_tickets(is_used);
 CREATE INDEX idx_user_tickets_used_at ON user_tickets(used_at) WHERE used_at IS NOT NULL;
+CREATE INDEX idx_user_tickets_chain ON user_tickets(chain_id);
+CREATE INDEX idx_user_tickets_chain_owner ON user_tickets(chain_id, owner_address);
 
 -- Transactions
 CREATE INDEX idx_transactions_user ON transactions(user_address);
 CREATE INDEX idx_transactions_type ON transactions(tx_type);
 CREATE INDEX idx_transactions_event ON transactions(event_contract_address);
 CREATE INDEX idx_transactions_timestamp ON transactions(tx_timestamp DESC);
+CREATE INDEX idx_transactions_chain ON transactions(chain_id);
+CREATE INDEX idx_transactions_chain_user ON transactions(chain_id, user_address);
 
 -- Royalty Recipients
 CREATE INDEX idx_royalty_recipients_event ON royalty_recipients(event_id);
@@ -228,6 +244,7 @@ CREATE INDEX idx_royalty_recipients_address ON royalty_recipients(recipient_addr
 CREATE INDEX idx_royalty_distributions_event ON royalty_distributions(event_id);
 CREATE INDEX idx_royalty_distributions_splitter ON royalty_distributions(splitter_address);
 CREATE INDEX idx_royalty_distributions_tx ON royalty_distributions(tx_hash);
+CREATE INDEX idx_royalty_distributions_chain ON royalty_distributions(chain_id);
 
 -- Comments
 CREATE INDEX idx_comments_event ON comments(event_id);
@@ -354,14 +371,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Atomically increment sold_count for an event
-CREATE OR REPLACE FUNCTION increment_sold_count(contract_addr TEXT)
-RETURNS void AS $$
+CREATE OR REPLACE FUNCTION increment_sold_count(contract_addr TEXT, p_chain_id INTEGER)
+RETURNS void AS $fn$
 BEGIN
     UPDATE events
     SET sold_count = sold_count + 1
-    WHERE contract_address = contract_addr;
+    WHERE contract_address = contract_addr
+      AND chain_id = p_chain_id;
 END;
-$$ LANGUAGE plpgsql;
+$fn$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 7. TRIGGERS

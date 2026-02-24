@@ -8,7 +8,8 @@ import {
     usePublicClient,
 } from "wagmi";
 import { parseEther } from "viem";
-import { CONTRACT_ADDRESSES, EventFactoryABI, EventTicketABI } from "./contracts";
+import { EventFactoryABI, EventTicketABI } from "./contracts";
+import { useChainConfig } from "./useChainConfig";
 import type { Event, EventCreationForm } from "@/types/event";
 import { ErrorCode, type AppError } from "@/types/errors";
 import { txToast } from "@/utils/toast";
@@ -31,6 +32,7 @@ export function useEventFactory() {
     const [soldCounts, setSoldCounts] = useState<Record<string, number>>({});
     const { address, isConnected } = useAccount();
     const publicClient = usePublicClient();
+    const { contracts, chainId } = useChainConfig();
 
     const { writeContractAsync } = useWriteContract();
 
@@ -40,7 +42,7 @@ export function useEventFactory() {
         refetch: refetchEventAddresses,
         isLoading: isLoadingAddresses,
     } = useReadContract({
-        address: CONTRACT_ADDRESSES.EventFactory,
+        address: contracts?.EventFactory,
         abi: EventFactoryABI,
         functionName: "getEvents",
     });
@@ -51,7 +53,7 @@ export function useEventFactory() {
         refetch: refetchEventInfos,
         isLoading: isLoadingInfos,
     } = useReadContract({
-        address: CONTRACT_ADDRESSES.EventFactory,
+        address: contracts?.EventFactory,
         abi: EventFactoryABI,
         functionName: "getMultipleEventInfo",
         args: eventAddresses && eventAddresses.length > 0 ? [eventAddresses] : undefined,
@@ -97,7 +99,7 @@ export function useEventFactory() {
     // Create a new event
     const createEvent = useCallback(
         async (form: EventCreationForm): Promise<{ txHash: `0x${string}`; contractAddress: `0x${string}`; royaltySplitterAddress: `0x${string}` | null } | null> => {
-            if (!isConnected || !address || !publicClient) {
+            if (!isConnected || !address || !publicClient || !contracts) {
                 setError({
                     code: ErrorCode.WALLET_NOT_CONNECTED,
                     message: "Please connect your wallet to create an event",
@@ -143,7 +145,7 @@ export function useEventFactory() {
                 // Check if custom max resale price is provided
                 if (form.maxResalePrice && parseFloat(form.maxResalePrice) > 0) {
                     // Calculate max resale percentage from the provided price
-                    // maxResalePrice is in XTZ, ticketPrice is in XTZ
+                    // maxResalePrice is in native currency, ticketPrice is in native currency
                     // percentage = (maxResalePrice / ticketPrice) * 100
                     const maxResalePercent = Math.round(
                         (parseFloat(form.maxResalePrice) / parseFloat(form.ticketPrice)) * 100
@@ -154,7 +156,7 @@ export function useEventFactory() {
 
                     // Use createEventAdvanced with custom max resale percentage and royalty
                     hash = await writeContractAsync({
-                        address: CONTRACT_ADDRESSES.EventFactory,
+                        address: contracts.EventFactory,
                         abi: EventFactoryABI,
                         functionName: "createEventAdvanced",
                         args: [
@@ -175,7 +177,7 @@ export function useEventFactory() {
                 } else {
                     // Use createEventAdvanced with default 110% max resale but custom royalty
                     hash = await writeContractAsync({
-                        address: CONTRACT_ADDRESSES.EventFactory,
+                        address: contracts.EventFactory,
                         abi: EventFactoryABI,
                         functionName: "createEventAdvanced",
                         args: [
@@ -201,7 +203,7 @@ export function useEventFactory() {
                 // Fetch the latest event contract address from the factory
                 // This is the most reliable way since the factory tracks all created events
                 const addresses = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.EventFactory,
+                    address: contracts.EventFactory,
                     abi: EventFactoryABI,
                     functionName: "getEventsByOrganizer",
                     args: [address],
@@ -218,7 +220,7 @@ export function useEventFactory() {
                 let royaltySplitterAddress: `0x${string}` | null = null;
                 try {
                     const splitter = await publicClient.readContract({
-                        address: CONTRACT_ADDRESSES.EventFactory,
+                        address: contracts.EventFactory,
                         abi: EventFactoryABI,
                         functionName: "eventSplitter",
                         args: [contractAddress],
@@ -246,7 +248,7 @@ export function useEventFactory() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync, refetchEventAddresses, refetchEventInfos]
+        [isConnected, address, publicClient, writeContractAsync, refetchEventAddresses, refetchEventInfos, contracts]
     );
 
     // Transform contract data to Event type
@@ -256,6 +258,7 @@ export function useEventFactory() {
         return (eventInfos as EventInfo[]).map((info) => ({
             id: info.id.toString(),
             contractAddress: info.contractAddress,
+            chainId,
             name: info.name,
             description: "",
             date: new Date(Number(info.eventDate) * 1000),
@@ -266,7 +269,7 @@ export function useEventFactory() {
             soldCount: soldCounts[info.contractAddress] ?? 0,
             organizer: info.organizer,
         }));
-    }, [eventInfos, soldCounts]);
+    }, [eventInfos, soldCounts, chainId]);
 
     // Refetch all event data
     const refetch = useCallback(async () => {

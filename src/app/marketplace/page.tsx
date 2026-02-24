@@ -1,25 +1,47 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useState, useEffect } from "react";
+import { useAccount, useSwitchChain } from "wagmi";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useMarketplaceListings } from "@/hooks/useMarketplaceListings";
 import { syncListing, syncTransaction, syncTicket, findEventIdByContract } from "@/lib/api/sync";
+import { useChainConfig } from "@/hooks/useChainConfig";
 import {
     ListingGrid,
     BuyTicketModal,
     MarketplaceEmptyState,
 } from "@/components/marketplace";
 import type { MarketplaceListing } from "@/types/ticket";
+import { ChainFilter } from "@/components/ui/ChainFilter";
+import { StyledSelect } from "@/components/ui/StyledSelect";
+import { Pagination, PageSizeSelector } from "@/components/ui/Pagination";
+
+const SORT_OPTIONS = [
+    { value: "newest", label: "Newest First" },
+    { value: "oldest", label: "Oldest First" },
+    { value: "price_low", label: "Price: Low to High" },
+    { value: "price_high", label: "Price: High to Low" },
+];
 
 export default function MarketplacePage() {
     const { address, isConnected } = useAccount();
+    const { chainId } = useChainConfig();
+    const { switchChainAsync } = useSwitchChain();
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [sortBy, setSortBy] = useState("newest");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(6);
 
     // Get listings from database (not blockchain)
-    const { listings, eventInfoMap, isLoading, error, refetch } = useMarketplaceListings({ status: "active" });
+    const { listings, eventInfoMap, isLoading, error, refetch, totalPages } = useMarketplaceListings({ status: "active", chainId: selectedChainId, page: currentPage, pageSize });
 
     // Only use blockchain hook for write operations
     const { buyTicket, cancelListing } = useMarketplace();
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedChainId]);
 
     const [processingListingId, setProcessingListingId] = useState<bigint | null>(null);
 
@@ -37,6 +59,17 @@ export default function MarketplacePage() {
     const handleBuyConfirm = async () => {
         if (!selectedListing || !address) return;
 
+        // Prompt wallet to switch chain if needed
+        if (selectedListing.chainId && selectedListing.chainId !== chainId) {
+            try {
+                await switchChainAsync({ chainId: selectedListing.chainId });
+            } catch {
+                return;
+            }
+            // Chain switched — wagmi re-renders. User needs to confirm again.
+            return;
+        }
+
         setProcessingListingId(selectedListing.listingId);
         const result = await buyTicket(selectedListing.listingId, selectedListing.price);
 
@@ -52,6 +85,7 @@ export default function MarketplacePage() {
                 price: selectedListing.price.toString(),
                 buyer_address: address,
                 action: "buy",
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             // Record purchase transaction for buyer
@@ -67,6 +101,7 @@ export default function MarketplacePage() {
                 from_address: selectedListing.seller,
                 to_address: address,
                 tx_timestamp: new Date().toISOString(),
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             // Record sale transaction for seller
@@ -82,6 +117,7 @@ export default function MarketplacePage() {
                 from_address: selectedListing.seller,
                 to_address: address,
                 tx_timestamp: new Date().toISOString(),
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             await syncTicket({
@@ -91,6 +127,7 @@ export default function MarketplacePage() {
                 owner_address: address,
                 is_listed: false,
                 action: "transfer",
+                chain_id: selectedListing.chainId ?? chainId,
             });
 
             setBuyModalOpen(false);
@@ -110,6 +147,16 @@ export default function MarketplacePage() {
     const handleCancelListing = async (listing: MarketplaceListing) => {
         if (!address) return;
 
+        // Prompt wallet to switch chain if needed
+        if (listing.chainId && listing.chainId !== chainId) {
+            try {
+                await switchChainAsync({ chainId: listing.chainId });
+            } catch {
+                return;
+            }
+            return;
+        }
+
         setProcessingListingId(listing.listingId);
         const result = await cancelListing(listing.listingId);
 
@@ -124,6 +171,7 @@ export default function MarketplacePage() {
                 seller_address: listing.seller,
                 price: listing.price.toString(),
                 action: "cancel",
+                chain_id: listing.chainId ?? chainId,
             });
 
             if (result.txHash) {
@@ -136,6 +184,7 @@ export default function MarketplacePage() {
                     event_id: eventId || undefined,
                     listing_id: listing.listingId.toString(),
                     tx_timestamp: new Date().toISOString(),
+                    chain_id: listing.chainId ?? chainId,
                 });
             }
 
@@ -146,6 +195,7 @@ export default function MarketplacePage() {
                 owner_address: address,
                 is_listed: false,
                 action: "unlist",
+                chain_id: listing.chainId ?? chainId,
             });
 
             await refetch();
@@ -163,11 +213,22 @@ export default function MarketplacePage() {
         <div className="min-h-screen bg-slate-900 pt-24 pb-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Page Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Ticket Marketplace</h1>
-                    <p className="text-gray-400">
-                        Buy and sell tickets securely with blockchain verification
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white mb-2">Ticket Marketplace</h1>
+                        <p className="text-gray-400">
+                            Buy and sell tickets securely with blockchain verification
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <StyledSelect
+                            value={sortBy}
+                            onChange={setSortBy}
+                            options={SORT_OPTIONS}
+                        />
+                        <PageSizeSelector pageSize={pageSize} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                    </div>
                 </div>
 
                 {/* Wallet Connection Notice */}
@@ -207,15 +268,19 @@ export default function MarketplacePage() {
 
                 {/* Listings Grid */}
                 {(isLoading || listings.length > 0) && (
-                    <ListingGrid
-                        listings={listings}
-                        eventInfoMap={eventInfoMap}
-                        isLoading={isLoading}
-                        currentUserAddress={address}
-                        onBuy={handleBuyClick}
-                        onCancel={handleCancelListing}
-                        processingListingId={processingListingId}
-                    />
+                    <>
+                        <ListingGrid
+                            listings={listings}
+                            eventInfoMap={eventInfoMap}
+                            isLoading={isLoading}
+                            currentUserAddress={address}
+                            onBuy={handleBuyClick}
+                            onCancel={handleCancelListing}
+                            processingListingId={processingListingId}
+                            sortBy={sortBy}
+                        />
+                        {!isLoading && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
+                    </>
                 )}
             </div>
 

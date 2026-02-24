@@ -19,6 +19,9 @@ interface UseEventsFromDBOptions {
     state?: string | null;
     country?: string | null;
     date?: string | null;
+    chainId?: number | null;
+    page?: number;
+    pageSize?: number;
 }
 
 export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
@@ -33,6 +36,9 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
         city,
         state,
         country,
+        chainId,
+        page = 1,
+        pageSize = 12,
     } = options;
 
     const date = options.date ?? null;
@@ -41,6 +47,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
     const [rawEvents, setRawEvents] = useState<DBEvent[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<AppError | null>(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     const fetchEvents = useCallback(async () => {
         setIsLoading(true);
@@ -60,6 +67,9 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
             if (state) params.set("state", state);
             if (country) params.set("country", country);
             if (date) params.set("date", date);
+            if (chainId) params.set("chain_id", String(chainId));
+            params.set("limit", String(pageSize));
+            params.set("offset", String((page - 1) * pageSize));
 
             const response = await fetch(`/api/events?${params.toString()}`);
 
@@ -69,6 +79,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
 
             const data = await response.json();
             const dbEvents: DBEvent[] = data.events || [];
+            setTotalCount(data.totalCount ?? dbEvents.length);
 
             setRawEvents(dbEvents);
 
@@ -78,6 +89,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
                 .map((e) => ({
                     id: e.id,
                     contractAddress: e.contract_address as `0x${string}`,
+                    chainId: e.chain_id,
                     name: e.name,
                     description: e.description || "",
                     date: e.date ? new Date(e.date) : new Date(),
@@ -104,7 +116,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
         } finally {
             setIsLoading(false);
         }
-    }, [status, organizer, lat, lon, radius, sortByDistance, city, state, country, date]);
+    }, [status, organizer, lat, lon, radius, sortByDistance, city, state, country, date, chainId, page, pageSize]);
 
     useEffect(() => {
         if (autoFetch) {
@@ -118,5 +130,7 @@ export function useEventsFromDB(options: UseEventsFromDBOptions = {}) {
         isLoading,
         error,
         refetch: fetchEvents,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
     };
 }

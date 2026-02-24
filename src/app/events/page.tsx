@@ -6,6 +6,8 @@ import { useEventsFromDB } from "@/hooks/useEventsFromDB";
 import { useEventDates } from "@/hooks/useEventDates";
 import { useGeolocationContext } from "@/components/providers/GeolocationProvider";
 import { EventCard, EventCardSkeleton, EmptyState, EventCalendarFilter } from "@/components/events";
+import { ChainFilter } from "@/components/ui/ChainFilter";
+import { Pagination, PageSizeSelector } from "@/components/ui/Pagination";
 
 type LocationTab = "all" | "nearby" | "city" | "search";
 
@@ -237,10 +239,13 @@ export default function EventsPage() {
     const [selectedRadius, setSelectedRadius] = useState(50);
     const [searchCity, setSearchCity] = useState<CityResult | null>(null);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
     const [showCalendar, setShowCalendar] = useState(false);
     const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
     const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth() + 1);
     const calendarRef = useRef<HTMLDivElement>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(6);
 
     // Close calendar on outside click
     useEffect(() => {
@@ -257,7 +262,7 @@ export default function EventsPage() {
     const hasLocation = latitude !== null && longitude !== null;
 
     const fetchOptions = useMemo(() => {
-        const base: Parameters<typeof useEventsFromDB>[0] = { status: "published" };
+        const base: Parameters<typeof useEventsFromDB>[0] = { status: "published", page: currentPage, pageSize };
 
         if (activeTab === "nearby" && hasLocation) {
             base.lat = latitude;
@@ -274,10 +279,19 @@ export default function EventsPage() {
             base.date = selectedDate;
         }
 
-        return base;
-    }, [activeTab, hasLocation, latitude, longitude, selectedRadius, city, searchCity, selectedDate]);
+        if (selectedChainId) {
+            base.chainId = selectedChainId;
+        }
 
-    const { events, isLoading, error, refetch } = useEventsFromDB(fetchOptions);
+        return base;
+    }, [activeTab, hasLocation, latitude, longitude, selectedRadius, city, searchCity, selectedDate, selectedChainId, currentPage, pageSize]);
+
+    const { events, isLoading, error, refetch, totalPages } = useEventsFromDB(fetchOptions);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, selectedRadius, searchCity, selectedDate, selectedChainId]);
 
     // Fetch event dates for the calendar dots from the API
     const { eventDates } = useEventDates(calendarYear, calendarMonth);
@@ -359,6 +373,10 @@ export default function EventsPage() {
                                 setActiveTab(c ? "search" : "all");
                             }}
                         />
+
+                        <PageSizeSelector pageSize={pageSize} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
+
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
 
                         {/* Calendar toggle */}
                         <div ref={calendarRef} className="relative">
@@ -525,6 +543,7 @@ export default function EventsPage() {
                                 <EventCard key={event.id} event={event} showDistance={activeTab === "nearby"} />
                             ))}
                         </div>
+                        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                     </>
                 )}
             </div>

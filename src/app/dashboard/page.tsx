@@ -4,14 +4,25 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { TicketGalleryFromDB } from "@/components/dashboard/TicketGalleryFromDB";
 import { TransactionHistoryFromDB } from "@/components/dashboard/TransactionHistoryFromDB";
+import { ChainFilter } from "@/components/ui/ChainFilter";
+import { StyledSelect } from "@/components/ui/StyledSelect";
+import { PageSizeSelector } from "@/components/ui/Pagination";
 
 type TabType = "tickets" | "history";
 type TicketFilter = "all" | "unlisted" | "listed";
+
+const TICKET_FILTER_OPTIONS = [
+    { value: "all", label: "All" },
+    { value: "unlisted", label: "Unlisted" },
+    { value: "listed", label: "Listed" },
+];
 
 export default function DashboardPage() {
     const { isConnected, address } = useAccount();
     const [activeTab, setActiveTab] = useState<TabType>("tickets");
     const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [pageSize, setPageSize] = useState(6);
 
     // Protected route - require wallet connection
     if (!isConnected) {
@@ -88,34 +99,29 @@ export default function DashboardPage() {
 
                     {/* Filter Dropdown - Only show on tickets tab */}
                     {activeTab === "tickets" && (
-                        <div className="relative pb-3">
-                            <select
+                        <div className="flex items-center gap-3 pb-3">
+                            <PageSizeSelector pageSize={pageSize} onPageSizeChange={setPageSize} />
+                            <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                            <StyledSelect
                                 value={ticketFilter}
-                                onChange={(e) => setTicketFilter(e.target.value as TicketFilter)}
-                                className="bg-slate-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2 pr-8 cursor-pointer hover:border-purple-500/50 focus:outline-none focus:border-purple-500 transition-colors"
-                                style={{
-                                    WebkitAppearance: "none",
-                                    MozAppearance: "none",
-                                    appearance: "none",
-                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
-                                    backgroundRepeat: "no-repeat",
-                                    backgroundPosition: "right 0.5rem center",
-                                    backgroundSize: "1rem",
-                                }}
-                            >
-                                <option value="all">All</option>
-                                <option value="unlisted">Unlisted</option>
-                                <option value="listed">Listed</option>
-                            </select>
+                                onChange={(val) => setTicketFilter(val as TicketFilter)}
+                                options={TICKET_FILTER_OPTIONS}
+                            />
+                        </div>
+                    )}
+                    {activeTab === "history" && (
+                        <div className="flex items-center gap-3 pb-3">
+                            <PageSizeSelector pageSize={pageSize} onPageSizeChange={setPageSize} />
+                            <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
                         </div>
                     )}
                 </div>
 
                 {/* Tab Content */}
                 {activeTab === "tickets" ? (
-                    <TicketGalleryFromDB address={address!} filter={ticketFilter} />
+                    <TicketGalleryFromDB address={address!} filter={ticketFilter} chainId={selectedChainId} pageSize={pageSize} />
                 ) : (
-                    <TransactionHistoryFromDB address={address!} />
+                    <TransactionHistoryFromDB address={address!} chainId={selectedChainId} pageSize={pageSize} />
                 )}
             </div>
         </div>

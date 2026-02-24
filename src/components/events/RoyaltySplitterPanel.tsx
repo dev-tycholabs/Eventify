@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useSwitchChain } from "wagmi";
 import { formatEther } from "viem";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import {
-    CONTRACT_ADDRESSES,
     RoyaltySplitterABI,
     TicketMarketplaceABI,
 } from "@/hooks/contracts";
+import { getContractsForChain, getExplorerUrl, getNativeCurrencySymbol } from "@/config/chains";
 import { txToast } from "@/utils/toast";
 
 const NATIVE_CURRENCY = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa" as const;
@@ -37,6 +39,7 @@ interface RoyaltySplitterPanelProps {
     organizerAddress: string;
     splitterAddress: string | null;
     recipients: RoyaltyRecipientData[];
+    eventChainId: number;
     onDistributionSynced?: () => void;
 }
 
@@ -44,15 +47,21 @@ interface RoyaltySplitterPanelProps {
 function DirectClaimPanel({
     eventId,
     organizerAddress,
+    eventChainId,
     onDistributionSynced,
 }: {
     eventId: string;
     organizerAddress: string;
+    eventChainId: number;
     onDistributionSynced?: () => void;
 }) {
-    const { address } = useAccount();
-    const publicClient = usePublicClient();
+    const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
+    const { switchChainAsync } = useSwitchChain();
+
+    const contracts = getContractsForChain(eventChainId);
+    const explorerUrl = getExplorerUrl(eventChainId);
+    const currencySymbol = getNativeCurrencySymbol(eventChainId);
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [isClaiming, setIsClaiming] = useState(false);
@@ -65,14 +74,17 @@ function DirectClaimPanel({
 
     // Fetch claimable balance from marketplace for the organizer
     const fetchClaimable = useCallback(async () => {
-        if (!publicClient) return;
+        if (!contracts) return;
 
         setIsLoadingChain(true);
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "claimableFunds",
                     args: [organizerAddr, NATIVE_CURRENCY],
@@ -86,7 +98,7 @@ function DirectClaimPanel({
         } finally {
             setIsLoadingChain(false);
         }
-    }, [publicClient, organizerAddr]);
+    }, [eventChainId, organizerAddr, contracts]);
 
     // Fetch distribution history and total claimed from Supabase
     const fetchDistributions = useCallback(async () => {
@@ -116,22 +128,30 @@ function DirectClaimPanel({
     }, [fetchDistributions]);
 
     const handleDirectClaim = async () => {
-        if (!address) return;
+        if (!address || !contracts) return;
 
         setIsClaiming(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+            }
+
             // Snapshot the claimable amount before the tx
             const claimedAmount = marketplaceClaimable;
 
             txToast.pending("Claiming royalties from marketplace...");
             const hash = await writeContractAsync({
-                address: CONTRACT_ADDRESSES.TicketMarketplace,
+                address: contracts.TicketMarketplace,
                 abi: TicketMarketplaceABI,
                 functionName: "claimFunds",
                 args: [NATIVE_CURRENCY],
+                chainId: eventChainId,
             });
 
             // Wait for confirmation
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
             if (publicClient) {
                 await publicClient.waitForTransactionReceipt({ hash });
             }
@@ -184,7 +204,7 @@ function DirectClaimPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(marketplaceClaimable)} XTZ`
+                            `${formatEther(marketplaceClaimable)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
@@ -194,14 +214,14 @@ function DirectClaimPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(totalEarned)} XTZ`
+                            `${formatEther(totalEarned)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Claimed</p>
                     <p className="text-lg font-semibold text-cyan-400">
-                        {formatEther(totalClaimed)} XTZ
+                        {formatEther(totalClaimed)} {currencySymbol}
                     </p>
                 </div>
             </div>
@@ -223,12 +243,12 @@ function DirectClaimPanel({
                             {isLoadingChain ? (
                                 <span className="inline-block w-16 h-4 bg-slate-700/50 rounded animate-pulse" />
                             ) : (
-                                `${formatEther(totalEarned)} XTZ`
+                                `${formatEther(totalEarned)} ${currencySymbol}`
                             )}
                             <span className="text-xs text-gray-500 ml-1">earned</span>
                         </p>
                         <p className="text-xs text-cyan-400">
-                            {formatEther(totalClaimed)} XTZ
+                            {formatEther(totalClaimed)} {currencySymbol}
                             <span className="text-gray-500 ml-1">claimed</span>
                         </p>
                     </div>
@@ -288,7 +308,7 @@ function DirectClaimPanel({
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/tx/${d.tx_hash}`}
+                                            href={`${explorerUrl}/tx/${d.tx_hash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-purple-400 hover:text-purple-300 font-mono"
@@ -296,7 +316,7 @@ function DirectClaimPanel({
                                             {d.tx_hash.slice(0, 10)}...{d.tx_hash.slice(-8)}
                                         </a>
                                         <span className="text-sm font-semibold text-green-400">
-                                            {formatEther(BigInt(d.total_distributed))} XTZ
+                                            {formatEther(BigInt(d.total_distributed))} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>
@@ -331,11 +351,16 @@ export function RoyaltySplitterPanel({
     organizerAddress,
     splitterAddress,
     recipients,
+    eventChainId,
     onDistributionSynced,
 }: RoyaltySplitterPanelProps) {
-    const { address } = useAccount();
-    const publicClient = usePublicClient();
+    const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
+    const { switchChainAsync } = useSwitchChain();
+
+    const contracts = getContractsForChain(eventChainId);
+    const explorerUrl = getExplorerUrl(eventChainId);
+    const currencySymbol = getNativeCurrencySymbol(eventChainId);
 
     const [marketplaceClaimable, setMarketplaceClaimable] = useState<bigint>(BigInt(0));
     const [splitterBalance, setSplitterBalance] = useState<bigint>(BigInt(0));
@@ -350,17 +375,20 @@ export function RoyaltySplitterPanel({
 
     // Fetch on-chain balances
     const fetchOnChainBalances = useCallback(async () => {
-        if (!publicClient || !hasSplitter || !splitterAddr) return;
+        if (!hasSplitter || !splitterAddr || !contracts) return;
 
         setIsLoadingChain(true);
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             const balance = await publicClient.getBalance({ address: splitterAddr });
             setSplitterBalance(balance);
 
             let claimable = BigInt(0);
             try {
                 claimable = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts.TicketMarketplace,
                     abi: [
                         {
                             inputs: [
@@ -385,7 +413,7 @@ export function RoyaltySplitterPanel({
         } finally {
             setIsLoadingChain(false);
         }
-    }, [publicClient, hasSplitter, splitterAddr]);
+    }, [eventChainId, hasSplitter, splitterAddr, contracts]);
 
     // Fetch distribution history from Supabase
     const fetchDistributions = useCallback(async () => {
@@ -411,9 +439,12 @@ export function RoyaltySplitterPanel({
 
     // Wait for tx confirmation, read released() for each recipient, and sync to Supabase
     const syncDistributionToSupabase = async (txHash: `0x${string}`, action: "claim_and_distribute" | "distribute") => {
-        if (!publicClient || !splitterAddr || !address) return;
+        if (!splitterAddr || !address) return;
 
         try {
+            const publicClient = getPublicClient(config, { chainId: eventChainId });
+            if (!publicClient) return;
+
             // Wait for the transaction to be mined before reading updated state
             await publicClient.waitForTransactionReceipt({ hash: txHash });
 
@@ -430,7 +461,7 @@ export function RoyaltySplitterPanel({
                 })
             );
 
-            await fetch(`/api/events/${eventId}/royalties`, {
+            const res = await fetch(`/api/events/${eventId}/royalties`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -439,8 +470,14 @@ export function RoyaltySplitterPanel({
                     triggered_by: address,
                     splitter_address: splitterAddr,
                     recipients: recipientReleased,
+                    chain_id: eventChainId,
                 }),
             });
+
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                console.error("Royalty sync API error:", res.status, errBody);
+            }
 
             // Refresh distribution history and notify parent
             await fetchDistributions();
@@ -452,16 +489,25 @@ export function RoyaltySplitterPanel({
     };
 
     const handleClaimAndDistribute = async () => {
-        if (!splitterAddr) return;
+        if (!splitterAddr || !contracts) return;
 
         setIsClaiming(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+                // Small delay to let wagmi update internal state after chain switch
+                await new Promise((r) => setTimeout(r, 500));
+            }
+
             txToast.pending("Claiming royalties from marketplace and distributing...");
             const hash = await writeContractAsync({
                 address: splitterAddr,
                 abi: RoyaltySplitterABI,
                 functionName: "claimAndDistribute",
-                args: [CONTRACT_ADDRESSES.TicketMarketplace, NATIVE_CURRENCY],
+                args: [contracts.TicketMarketplace, NATIVE_CURRENCY],
+                chainId: eventChainId,
             });
 
             // Sync on-chain state to Supabase (waits for tx confirmation internally)
@@ -486,11 +532,18 @@ export function RoyaltySplitterPanel({
 
         setIsDistributing(true);
         try {
+            // Switch chain if needed
+            if (chain?.id !== eventChainId) {
+                txToast.pending("Switching network...");
+                await switchChainAsync({ chainId: eventChainId });
+            }
+
             txToast.pending("Distributing royalties to recipients...");
             const hash = await writeContractAsync({
                 address: splitterAddr,
                 abi: RoyaltySplitterABI,
                 functionName: "distribute",
+                chainId: eventChainId,
             });
 
             // Sync on-chain state to Supabase (waits for tx confirmation internally)
@@ -516,6 +569,7 @@ export function RoyaltySplitterPanel({
             <DirectClaimPanel
                 eventId={eventId}
                 organizerAddress={organizerAddress}
+                eventChainId={eventChainId}
                 onDistributionSynced={onDistributionSynced}
             />
         );
@@ -543,7 +597,7 @@ export function RoyaltySplitterPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(marketplaceClaimable)} XTZ`
+                            `${formatEther(marketplaceClaimable)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
@@ -553,20 +607,20 @@ export function RoyaltySplitterPanel({
                         {isLoadingChain ? (
                             <span className="inline-block w-20 h-5 bg-slate-700/50 rounded animate-pulse" />
                         ) : (
-                            `${formatEther(splitterBalance)} XTZ`
+                            `${formatEther(splitterBalance)} ${currencySymbol}`
                         )}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Earned</p>
                     <p className="text-lg font-semibold text-green-400">
-                        {formatEther(totalRoyaltyEarned)} XTZ
+                        {formatEther(totalRoyaltyEarned)} {currencySymbol}
                     </p>
                 </div>
                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Claimed</p>
                     <p className="text-lg font-semibold text-cyan-400">
-                        {formatEther(totalRoyaltyClaimed)} XTZ
+                        {formatEther(totalRoyaltyClaimed)} {currencySymbol}
                     </p>
                 </div>
             </div>
@@ -594,11 +648,11 @@ export function RoyaltySplitterPanel({
                             </div>
                             <div className="text-right flex-shrink-0">
                                 <p className="text-sm font-semibold text-green-400">
-                                    {formatEther(BigInt(r.royalty_earned || "0"))} XTZ
+                                    {formatEther(BigInt(r.royalty_earned || "0"))} {currencySymbol}
                                     <span className="text-xs text-gray-500 ml-1">earned</span>
                                 </p>
                                 <p className="text-xs text-cyan-400">
-                                    {formatEther(BigInt(r.royalty_claimed || "0"))} XTZ
+                                    {formatEther(BigInt(r.royalty_claimed || "0"))} {currencySymbol}
                                     <span className="text-gray-500 ml-1">claimed</span>
                                 </p>
                             </div>
@@ -613,7 +667,7 @@ export function RoyaltySplitterPanel({
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-500">Splitter Contract</span>
                         <a
-                            href={`https://shadownet.explorer.etherlink.com/address/${splitterAddr}`}
+                            href={`${explorerUrl}/address/${splitterAddr}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
@@ -702,7 +756,7 @@ export function RoyaltySplitterPanel({
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/tx/${d.tx_hash}`}
+                                            href={`${explorerUrl}/tx/${d.tx_hash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-purple-400 hover:text-purple-300 font-mono"
@@ -710,7 +764,7 @@ export function RoyaltySplitterPanel({
                                             {d.tx_hash.slice(0, 10)}...{d.tx_hash.slice(-8)}
                                         </a>
                                         <span className="text-sm font-semibold text-green-400">
-                                            {formatEther(BigInt(d.total_distributed))} XTZ
+                                            {formatEther(BigInt(d.total_distributed))} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>

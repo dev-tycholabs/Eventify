@@ -87,6 +87,12 @@ export function Header() {
                         >
                             Profile
                         </Link>
+                        <Link
+                            href="/wallet"
+                            className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                        >
+                            Wallet
+                        </Link>
                     </nav>
 
                     {/* Wallet Connect */}

@@ -3,14 +3,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
+import { useAccount, useWalletClient, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/config/wagmi-client";
 import { Header } from "@/components/Header";
 import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
 import { EventTicketScanner } from "@/components/events/EventTicketScanner";
 import { RoyaltySplitterPanel } from "@/components/events/RoyaltySplitterPanel";
 import { EventAttendeesPanel } from "@/components/events/EventAttendeesPanel";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { getExplorerUrl } from "@/config/chains";
 
 interface RoyaltyRecipientData {
     id: string;
@@ -56,6 +60,7 @@ interface EventData {
     organizer: string;
     contractAddress: `0x${string}`;
     contractBalance: bigint;
+    chainId: number;
     description: string | null;
     imageUrl: string | null;
     royaltySplitterAddress: string | null;
@@ -68,9 +73,9 @@ export default function EventManagePage() {
     const eventId = params.id as string;
 
     const { address, isConnected } = useAccount();
-    const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
     const { writeContractAsync } = useWriteContract();
+    const { currencySymbol } = useChainConfig();
 
     const [eventData, setEventData] = useState<EventData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -111,15 +116,17 @@ export default function EventManagePage() {
             }
 
             const contractAddress = event.contract_address as `0x${string}`;
+            const eventChainId = event.chain_id as number;
 
-            // Fetch contract balance if publicClient is available
+            // Fetch contract balance using chain-specific client
             let balance = BigInt(0);
-            if (publicClient) {
-                try {
-                    balance = await publicClient.getBalance({ address: contractAddress });
-                } catch (err) {
-                    console.error("Failed to fetch balance:", err);
+            try {
+                const chainPublicClient = getPublicClient(config, { chainId: eventChainId });
+                if (chainPublicClient) {
+                    balance = await chainPublicClient.getBalance({ address: contractAddress });
                 }
+            } catch (err) {
+                console.error("Failed to fetch balance:", err);
             }
 
             // Compute resale stats
@@ -152,6 +159,7 @@ export default function EventManagePage() {
                 organizer: event.organizer_address,
                 contractAddress,
                 contractBalance: balance,
+                chainId: eventChainId,
                 description: event.description,
                 imageUrl: event.image_url,
                 royaltySplitterAddress: event.royalty_splitter_address || null,
@@ -165,7 +173,7 @@ export default function EventManagePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [eventId, publicClient, address]);
+    }, [eventId]);
 
     useEffect(() => {
         if (eventId) {
@@ -185,10 +193,13 @@ export default function EventManagePage() {
 
     // Fetch current base URI from contract
     const fetchBaseURI = useCallback(async () => {
-        if (!publicClient || !eventData?.contractAddress) return;
+        if (!eventData?.contractAddress || !eventData?.chainId) return;
 
         try {
-            const baseURI = await publicClient.readContract({
+            const chainPublicClient = getPublicClient(config, { chainId: eventData.chainId });
+            if (!chainPublicClient) return;
+
+            const baseURI = await chainPublicClient.readContract({
                 address: eventData.contractAddress,
                 abi: EventTicketABI,
                 functionName: "baseTokenURI",
@@ -198,7 +209,7 @@ export default function EventManagePage() {
             console.error("Failed to fetch base URI:", err);
             setCurrentBaseURI("");
         }
-    }, [publicClient, eventData?.contractAddress]);
+    }, [eventData?.contractAddress, eventData?.chainId]);
 
     // Fetch base URI when event data is available
     useEffect(() => {
@@ -410,7 +421,7 @@ export default function EventManagePage() {
                                     : "bg-slate-700/50 text-gray-500 cursor-not-allowed"
                                     }`}
                             >
-                                Withdraw {formatEther(eventData.contractBalance)} XTZ
+                                Withdraw {formatEther(eventData.contractBalance)} {currencySymbol}
                             </button>
                         </div>
                     </div>
@@ -493,7 +504,7 @@ export default function EventManagePage() {
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Ticket Price</p>
                                     <p className="text-lg font-semibold text-white">
-                                        {formatEther(eventData.ticketPrice)} XTZ
+                                        {formatEther(eventData.ticketPrice)} {currencySymbol}
                                     </p>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
@@ -505,7 +516,7 @@ export default function EventManagePage() {
                                 <div className="bg-slate-800/50 rounded-xl p-5 border border-white/10">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Revenue</p>
                                     <p className="text-lg font-semibold text-green-400">
-                                        {formatEther(eventData.ticketPrice * BigInt(eventData.soldCount))} XTZ
+                                        {formatEther(eventData.ticketPrice * BigInt(eventData.soldCount))} {currencySymbol}
                                     </p>
                                 </div>
                             </div>
@@ -563,15 +574,15 @@ export default function EventManagePage() {
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Resale Volume</p>
-                                                    <p className="text-lg font-semibold text-green-400">{formatEther(eventData.resaleStats.totalResaleVolume)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-green-400">{formatEther(eventData.resaleStats.totalResaleVolume)} {currencySymbol}</p>
                                                 </div>
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Avg Resale Price</p>
-                                                    <p className="text-lg font-semibold text-purple-400">{formatEther(eventData.resaleStats.avgResalePrice)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-purple-400">{formatEther(eventData.resaleStats.avgResalePrice)} {currencySymbol}</p>
                                                 </div>
                                                 <div className="bg-slate-900/50 rounded-lg p-3">
                                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Highest Sale</p>
-                                                    <p className="text-lg font-semibold text-pink-400">{formatEther(eventData.resaleStats.highestResalePrice)} XTZ</p>
+                                                    <p className="text-lg font-semibold text-pink-400">{formatEther(eventData.resaleStats.highestResalePrice)} {currencySymbol}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -594,7 +605,7 @@ export default function EventManagePage() {
                                                             </span>
                                                         </div>
                                                         <div className="text-right flex-shrink-0">
-                                                            <p className="text-sm font-medium text-white">{formatEther(BigInt(listing.price || "0"))} XTZ</p>
+                                                            <p className="text-sm font-medium text-white">{formatEther(BigInt(listing.price || "0"))} {currencySymbol}</p>
                                                             <p className="text-xs text-gray-500">
                                                                 {new Date(listing.listed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                                             </p>
@@ -614,7 +625,7 @@ export default function EventManagePage() {
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Address</span>
                                         <a
-                                            href={`https://shadownet.explorer.etherlink.com/address/${eventData.contractAddress}`}
+                                            href={`${getExplorerUrl(eventData.chainId)}/address/${eventData.contractAddress}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sm text-purple-400 hover:text-purple-300 font-mono flex items-center gap-1"
@@ -628,7 +639,7 @@ export default function EventManagePage() {
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-gray-500">Contract Balance</span>
                                         <span className={`text-sm font-medium ${hasBalance ? "text-green-400" : "text-gray-400"}`}>
-                                            {formatEther(eventData.contractBalance)} XTZ
+                                            {formatEther(eventData.contractBalance)} {currencySymbol}
                                         </span>
                                     </div>
                                 </div>
@@ -646,6 +657,7 @@ export default function EventManagePage() {
                         <EventTicketScanner
                             eventContractAddress={eventData.contractAddress}
                             eventName={eventData.name}
+                            eventChainId={eventData.chainId}
                         />
                     )}
 
@@ -657,6 +669,7 @@ export default function EventManagePage() {
                             organizerAddress={eventData.organizer}
                             splitterAddress={eventData.royaltySplitterAddress}
                             recipients={eventData.royaltyRecipients}
+                            eventChainId={eventData.chainId}
                             onDistributionSynced={fetchEventData}
                         />
                     )}

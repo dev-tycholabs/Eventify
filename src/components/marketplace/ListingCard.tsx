@@ -2,6 +2,7 @@
 
 import { formatEther } from "viem";
 import type { MarketplaceListing } from "@/types/ticket";
+import { getNativeCurrencySymbol, SUPPORTED_CHAINS } from "@/config/chains";
 
 interface ListingCardProps {
     listing: MarketplaceListing;
@@ -26,6 +27,8 @@ export function ListingCard({
     onCancel,
     isLoading = false,
 }: ListingCardProps) {
+    const currencySymbol = getNativeCurrencySymbol(listing.chainId);
+    const chainName = SUPPORTED_CHAINS.find(c => c.id === listing.chainId)?.name;
     const formattedDate = eventDate?.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -67,6 +70,11 @@ export function ListingCard({
                 <div className="absolute top-3 left-3 px-2 py-1 bg-purple-500/80 text-white text-xs font-semibold rounded">
                     #{listing.tokenId.toString()}
                 </div>
+                {chainName && (
+                    <div className="absolute top-3 right-3 px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-gray-200 text-xs font-medium rounded">
+                        {chainName}
+                    </div>
+                )}
             </div>
 
             {/* Listing Details */}
@@ -106,7 +114,7 @@ export function ListingCard({
                     <div>
                         <p className="text-xs text-gray-500 uppercase tracking-wide">Price</p>
                         <p className="text-xl font-bold text-white">
-                            {formatEther(listing.price)} XTZ
+                            {formatEther(listing.price)} {currencySymbol}
                         </p>
                     </div>
                     <p className="text-xs text-gray-500">Listed {listedDate}</p>

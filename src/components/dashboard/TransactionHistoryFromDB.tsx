@@ -1,17 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { formatEther } from "viem";
-import { useTransactionsFromDB, type TransactionFromDB } from "@/hooks/useTransactionsFromDB";
+import { useTransactionsFromDB } from "@/hooks/useTransactionsFromDB";
+import { getNativeCurrencySymbol, getExplorerUrl } from "@/config/chains";
 import type { TransactionType } from "@/lib/supabase/types";
-
-const EXPLORER_URL = "https://shadownet.explorer.etherlink.com";
+import { Pagination } from "@/components/ui/Pagination";
 
 interface TransactionHistoryFromDBProps {
     address: `0x${string}`;
+    chainId?: number | null;
+    pageSize?: number;
 }
 
-export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBProps) {
-    const { transactions, isLoading } = useTransactionsFromDB({ user: address });
+export function TransactionHistoryFromDB({ address, chainId, pageSize = 6 }: TransactionHistoryFromDBProps) {
+    const [currentPage, setCurrentPage] = useState(1);
+    const { transactions, isLoading, totalPages } = useTransactionsFromDB({ user: address, chainId, page: currentPage, pageSize });
 
     const getTypeIcon = (type: TransactionType) => {
         switch (type) {
@@ -164,13 +168,13 @@ export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBPr
                             {tx.amount && tx.txType !== "listing" && tx.txType !== "cancel" && (
                                 <span className={`font-semibold ${tx.txType === "purchase" ? "text-red-400" : "text-green-400"
                                     }`}>
-                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} XTZ
+                                    {tx.txType === "purchase" ? "-" : "+"}{formatEther(tx.amount)} {getNativeCurrencySymbol(tx.chainId)}
                                 </span>
                             )}
 
                             {tx.txHash && !tx.txHash.startsWith("list-") && !tx.txHash.startsWith("buy-") && !tx.txHash.startsWith("cancel-") && (
                                 <a
-                                    href={`${EXPLORER_URL}/tx/${tx.txHash}`}
+                                    href={`${getExplorerUrl(tx.chainId)}/tx/${tx.txHash}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -185,6 +189,7 @@ export function TransactionHistoryFromDB({ address }: TransactionHistoryFromDBPr
                     </div>
                 </div>
             ))}
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
     );
 }

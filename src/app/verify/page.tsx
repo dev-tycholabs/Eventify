@@ -14,12 +14,14 @@ export interface VerificationData {
     eventDate?: Date;
     tokenId: bigint;
     eventAddress: `0x${string}`;
+    chainId: number;
 }
 
 interface QueryParams {
     contract: string | null;
     tokenId: string | null;
     event: string | null;
+    chainId: string | null;
 }
 
 function VerifyPageContent() {
@@ -33,9 +35,10 @@ function VerifyPageContent() {
         const contract = searchParams.get("contract");
         const tokenId = searchParams.get("tokenId");
         const event = searchParams.get("event");
+        const chainId = searchParams.get("chainId");
 
         if (contract && tokenId) {
-            setInitialParams({ contract, tokenId, event });
+            setInitialParams({ contract, tokenId, event, chainId });
         }
     }, [searchParams]);
 

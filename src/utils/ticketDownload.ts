@@ -10,6 +10,7 @@ interface TicketData {
     contractAddress: string;
     status: string;
     price: string;
+    chainId?: number;
 }
 
 async function generateQRCode(data: string): Promise<string> {
@@ -92,7 +93,7 @@ async function drawTicket(
 
     // QR Code section - contains URL to verify page
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const verifyUrl = `${baseUrl}/verify?contract=${data.contractAddress}&tokenId=${data.tokenId}&event=${encodeURIComponent(data.eventName)}`;
+    const verifyUrl = `${baseUrl}/verify?contract=${data.contractAddress}&tokenId=${data.tokenId}&event=${encodeURIComponent(data.eventName)}${data.chainId ? `&chainId=${data.chainId}` : ""}`;
 
     const qrCodeDataUrl = await generateQRCode(verifyUrl);
     const qrImage = new Image();

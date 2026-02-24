@@ -1,0 +1,17 @@
+{
+  "network": "unichainSepolia",
+  "chainId": 1301,
+  "deployer": "0x0b310BAb859B4d3D37084dD6A32f03389618B605",
+  "contracts": {
+    "Registry": "0x94160b094d53357180Fe952F2083C8247200c978",
+    "TicketMarketplace": "0x403D7d92024Cb6Be2Ff71866B635FBB086a789b3",
+    "RoyaltySplitter": "0x9Acd700c94d91D9155d1EE3b6cd21f31D0b6D244",
+    "EventFactory": "0x64fFDeE582187975b84E7Bba189D380D2289Dd6E"
+  },
+  "config": {
+    "platformFeePercent": 2.5,
+    "defaultRoyaltyPercent": 5,
+    "maxResalePricePercent": 110
+  },
+  "deployedAt": "2026-02-23T18:33:13.953Z"
+}

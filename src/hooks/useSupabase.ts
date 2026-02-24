@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
+import { useChainConfig } from "./useChainConfig";
 import type { Tables, InsertTables, EventStatus } from "@/lib/supabase/types";
 
 type User = Tables<"users">;
@@ -18,6 +19,7 @@ interface StoredAuth {
 
 export function useSupabase() {
     const { address } = useAccount();
+    const { chainId } = useChainConfig();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -177,6 +179,7 @@ export function useSupabase() {
                         message: storedAuth.message,
                         signature: storedAuth.signature,
                         event_id: eventId,
+                        chain_id: eventData.chain_id ?? chainId,
                         ...eventData,
                     }),
                 });
@@ -197,7 +200,7 @@ export function useSupabase() {
                 setIsLoading(false);
             }
         },
-        [address, getStoredAuth]
+        [address, getStoredAuth, chainId]
     );
 
     // Save as draft

@@ -8,9 +8,11 @@ type MarketplaceListing = Tables<"marketplace_listings">;
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const status = searchParams.get("status") as ListingStatus | null;
+        const statusParam = searchParams.get("status");
+        const status = statusParam !== "all" ? statusParam as ListingStatus | null : null;
         const seller = searchParams.get("seller");
         const eventContract = searchParams.get("event_contract");
+        const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
         const limit = parseInt(searchParams.get("limit") || "100");
         const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -33,9 +35,10 @@ export async function GET(request: NextRequest) {
             .range(offset, offset + limit - 1);
 
         // Default to active listings if no status specified
+        // Use status=all to fetch all statuses
         if (status) {
             query = query.eq("status", status);
-        } else {
+        } else if (!statusParam) {
             query = query.eq("status", "active");
         }
 
@@ -47,11 +50,43 @@ export async function GET(request: NextRequest) {
             query = query.eq("event_contract_address", eventContract.toLowerCase());
         }
 
+        if (chainId) {
+            query = query.eq("chain_id", chainId);
+        }
+
         const { data, error } = await query;
 
         if (error) throw error;
 
-        return NextResponse.json({ listings: data });
+        // Get counts for each status (shared base filters, no status filter)
+        const buildBaseQuery = () => {
+            let q = supabase
+                .from("marketplace_listings")
+                .select("id", { count: "exact", head: true });
+            if (seller) q = q.eq("seller_address", seller.toLowerCase());
+            if (eventContract) q = q.eq("event_contract_address", eventContract.toLowerCase());
+            if (chainId) q = q.eq("chain_id", chainId);
+            return q;
+        };
+
+        const [activeCount, soldCount, cancelledCount] = await Promise.all([
+            buildBaseQuery().eq("status", "active").then(r => r.count ?? 0),
+            buildBaseQuery().eq("status", "sold").then(r => r.count ?? 0),
+            buildBaseQuery().eq("status", "cancelled").then(r => r.count ?? 0),
+        ]);
+
+        const totalCount = activeCount + soldCount + cancelledCount;
+
+        return NextResponse.json({
+            listings: data,
+            totalCount,
+            statusCounts: {
+                all: totalCount,
+                active: activeCount,
+                sold: soldCount,
+                cancelled: cancelledCount,
+            },
+        });
     } catch (error) {
         console.error("Error fetching marketplace listings:", error);
         return NextResponse.json(
@@ -76,12 +111,13 @@ export async function POST(request: NextRequest) {
             status = "active",
             buyer_address,
             tx_hash,
+            chain_id,
             action, // "list", "buy", "cancel"
         } = body;
 
-        if (!listing_id || !seller_address) {
+        if (!listing_id || !seller_address || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields" },
+                { error: "Missing required fields (listing_id, seller_address, chain_id)" },
                 { status: 400 }
             );
         }
@@ -91,6 +127,7 @@ export async function POST(request: NextRequest) {
         if (action === "list") {
             // Create new listing
             const insertData: InsertTables<"marketplace_listings"> = {
+                chain_id: chain_id as number,
                 listing_id: listing_id.toString(),
                 token_id: token_id.toString(),
                 event_contract_address: event_contract_address.toLowerCase(),
@@ -103,7 +140,7 @@ export async function POST(request: NextRequest) {
 
             const { data, error } = await supabase
                 .from("marketplace_listings")
-                .upsert(insertData, { onConflict: "listing_id" })
+                .upsert(insertData, { onConflict: "chain_id,listing_id" })
                 .select()
                 .single();
 
@@ -114,7 +151,8 @@ export async function POST(request: NextRequest) {
                 .from("user_tickets")
                 .update({ is_listed: true, listing_id: listing_id.toString() })
                 .eq("event_contract_address", event_contract_address.toLowerCase())
-                .eq("token_id", token_id.toString());
+                .eq("token_id", token_id.toString())
+                .eq("chain_id", chain_id);
 
             return NextResponse.json({ listing: data });
         }
@@ -131,6 +169,7 @@ export async function POST(request: NextRequest) {
                 .from("marketplace_listings")
                 .update(updateData)
                 .eq("listing_id", listing_id.toString())
+                .eq("chain_id", chain_id)
                 .select()
                 .single();
 
@@ -147,7 +186,8 @@ export async function POST(request: NextRequest) {
                         listing_id: null,
                     })
                     .eq("event_contract_address", listing.event_contract_address)
-                    .eq("token_id", listing.token_id);
+                    .eq("token_id", listing.token_id)
+                    .eq("chain_id", chain_id);
 
                 // Track royalty earnings for recipients
                 // Find the event and its royalty config
@@ -158,6 +198,7 @@ export async function POST(request: NextRequest) {
                     .from("events")
                     .select("id, royalty_percent")
                     .eq("contract_address", eventContractAddr)
+                    .eq("chain_id", chain_id)
                     .single();
 
                 if (eventData && eventData.royalty_percent) {
@@ -205,6 +246,7 @@ export async function POST(request: NextRequest) {
                 .update(updateData)
                 .eq("listing_id", listing_id.toString())
                 .eq("seller_address", seller_address.toLowerCase())
+                .eq("chain_id", chain_id)
                 .select()
                 .single();
 
@@ -217,7 +259,8 @@ export async function POST(request: NextRequest) {
                     .from("user_tickets")
                     .update({ is_listed: false, listing_id: null })
                     .eq("event_contract_address", listing.event_contract_address)
-                    .eq("token_id", listing.token_id);
+                    .eq("token_id", listing.token_id)
+                    .eq("chain_id", chain_id);
             }
 
             return NextResponse.json({ listing: data });

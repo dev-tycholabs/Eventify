@@ -10,6 +10,7 @@ interface SyncListingParams {
     tx_hash?: string;
     action: "list" | "buy" | "cancel";
     buyer_address?: string;
+    chain_id: number;
 }
 
 interface SyncTicketParams {
@@ -23,6 +24,7 @@ interface SyncTicketParams {
     purchase_price?: string;
     purchase_tx_hash?: string;
     action: "mint" | "transfer" | "use" | "list" | "unlist";
+    chain_id: number;
 }
 
 interface SyncTransactionParams {
@@ -38,6 +40,7 @@ interface SyncTransactionParams {
     to_address?: string;
     block_number?: string;
     tx_timestamp: string;
+    chain_id: number;
 }
 
 export async function syncListing(params: SyncListingParams): Promise<boolean> {

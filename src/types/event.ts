@@ -1,6 +1,7 @@
 export interface Event {
     id: string;
     contractAddress: `0x${string}`;
+    chainId: number;
     name: string;
     description: string;
     date: Date;

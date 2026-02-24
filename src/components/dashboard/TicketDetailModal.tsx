@@ -6,6 +6,7 @@ import { downloadTicketAsPNG, downloadTicketAsPDF } from "@/utils/ticketDownload
 import toast from "react-hot-toast";
 import QRCode from "qrcode";
 import { TicketHistoryModal } from "./TicketHistoryModal";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 interface UserTicket {
     tokenId: bigint;
@@ -35,6 +36,7 @@ export function TicketDetailModal({
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
     const [showHistory, setShowHistory] = useState(false);
     const ticketRef = useRef<HTMLDivElement>(null);
+    const { currencySymbol, chainId } = useChainConfig();
 
     // Generate real QR code using the qrcode library - contains URL to verify page
     useEffect(() => {
@@ -46,7 +48,7 @@ export function TicketDetailModal({
         const generateQR = async () => {
             // Build verify URL with query params for direct scanning
             const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-            const verifyUrl = `${baseUrl}/verify?contract=${ticket.eventContractAddress}&tokenId=${ticket.tokenId.toString()}&event=${encodeURIComponent(ticket.eventName)}`;
+            const verifyUrl = `${baseUrl}/verify?contract=${ticket.eventContractAddress}&tokenId=${ticket.tokenId.toString()}&event=${encodeURIComponent(ticket.eventName)}&chainId=${chainId}`;
 
             try {
                 const dataUrl = await QRCode.toDataURL(verifyUrl, {
@@ -61,7 +63,7 @@ export function TicketDetailModal({
         };
 
         generateQR();
-    }, [ticket]);
+    }, [ticket, chainId]);
 
     const handleDownloadPNG = async () => {
         if (!ticket) return;
@@ -214,7 +216,7 @@ export function TicketDetailModal({
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase tracking-wide">Original Price</p>
-                                    <p className="text-white font-medium">{formatEther(ticket.ticketPrice)} XTZ</p>
+                                    <p className="text-white font-medium">{formatEther(ticket.ticketPrice)} {currencySymbol}</p>
                                 </div>
                             </div>
                         </div>

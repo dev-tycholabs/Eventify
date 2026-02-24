@@ -25,6 +25,7 @@ export interface MarketplaceListing {
     listingId: bigint;
     tokenId: bigint;
     eventContractAddress: `0x${string}`;
+    chainId: number;
     seller: `0x${string}`;
     price: bigint;
     isActive: boolean;

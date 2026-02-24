@@ -8,6 +8,9 @@ import { useOrganizerEventsFromDB, type OrganizerEventFromDB } from "@/hooks/use
 import { EventManageCard, EventManageModal } from "@/components/events";
 import { EventTicketABI } from "@/hooks/contracts";
 import { txToast } from "@/utils/toast";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import { ChainFilter } from "@/components/ui/ChainFilter";
+import { Pagination, PageSizeSelector } from "@/components/ui/Pagination";
 import type { Tables } from "@/lib/supabase/types";
 
 type Event = Tables<"events">;
@@ -16,12 +19,17 @@ type ViewMode = "drafts" | "published";
 export default function MyEventsPage() {
     const { address, isConnected } = useAccount();
     const { getEvents, deleteDraft } = useSupabase();
+    const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(6);
     const {
         organizerEvents,
         isLoading: isLoadingOnChain,
-        refetch: refetchOnChain
-    } = useOrganizerEventsFromDB();
+        refetch: refetchOnChain,
+        totalPages,
+    } = useOrganizerEventsFromDB({ chainId: selectedChainId, page: currentPage, pageSize });
     const { writeContractAsync } = useWriteContract();
+    const { currencySymbol } = useChainConfig();
     const publicClient = usePublicClient();
 
     const [draftEvents, setDraftEvents] = useState<Event[]>([]);
@@ -162,6 +170,10 @@ export default function MyEventsPage() {
                             {viewMode === "drafts" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500" />}
                         </button>
                     </div>
+                    <div className="flex items-center gap-3 pb-3">
+                        <PageSizeSelector pageSize={pageSize} onPageSizeChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
+                        <ChainFilter value={selectedChainId} onChange={setSelectedChainId} />
+                    </div>
                 </div>
 
                 {viewMode === "published" && (
@@ -201,11 +213,14 @@ export default function MyEventsPage() {
                         )}
 
                         {!isLoadingOnChain && organizerEvents.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {organizerEvents.map((event) => (
-                                    <EventManageCard key={event.contractAddress} event={event} onManage={() => handleManageEvent(event)} onWithdraw={() => handleWithdraw(event)} />
-                                ))}
-                            </div>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {organizerEvents.map((event) => (
+                                        <EventManageCard key={event.contractAddress} event={event} onManage={() => handleManageEvent(event)} onWithdraw={() => handleWithdraw(event)} />
+                                    ))}
+                                </div>
+                                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                            </>
                         )}
                     </>
                 )}
@@ -263,6 +278,7 @@ interface DraftCardProps {
 
 function DraftCard({ event, onDelete }: DraftCardProps) {
     const eventDate = event.date ? new Date(event.date) : null;
+    const { currencySymbol } = useChainConfig();
 
     return (
         <div className="bg-slate-800/50 rounded-xl overflow-hidden border border-white/10 hover:border-yellow-500/30 transition-all group">
@@ -302,7 +318,7 @@ function DraftCard({ event, onDelete }: DraftCardProps) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        {event.ticket_price} XTZ
+                        {event.ticket_price} {currencySymbol}
                     </div>
                 )}
                 <div className="flex gap-2">

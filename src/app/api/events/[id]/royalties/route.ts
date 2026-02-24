@@ -16,17 +16,19 @@ export async function POST(
             triggered_by,
             splitter_address,
             recipients,
+            chain_id,
         } = body as {
             tx_hash: string;
             action: RoyaltyDistributionAction;
             triggered_by: string;
             splitter_address: string;
             recipients: { address: string; released: string }[];
+            chain_id: number;
         };
 
-        if (!tx_hash || !action || !triggered_by) {
+        if (!tx_hash || !action || !triggered_by || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields" },
+                { error: "Missing required fields (tx_hash, action, triggered_by, chain_id)" },
                 { status: 400 }
             );
         }
@@ -41,6 +43,7 @@ export async function POST(
                 tx_hash: string;
                 action: RoyaltyDistributionAction;
                 triggered_by: string;
+                chain_id: number;
             };
 
             if (!claimed_amount || !organizer_address) {
@@ -82,6 +85,7 @@ export async function POST(
             const { error: logError } = await supabase
                 .from("royalty_distributions")
                 .insert({
+                    chain_id: chain_id as number,
                     event_id: eventId,
                     splitter_address: organizer_address.toLowerCase(),
                     tx_hash,
@@ -152,6 +156,7 @@ export async function POST(
         const { error: logError } = await supabase2
             .from("royalty_distributions")
             .insert({
+                chain_id: chain_id as number,
                 event_id: eventId,
                 splitter_address: splitter_address.toLowerCase(),
                 tx_hash,

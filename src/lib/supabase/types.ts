@@ -164,6 +164,7 @@ export interface Database {
             events: {
                 Row: {
                     id: string;
+                    chain_id: number;
                     contract_address: string | null;
                     organizer_address: string;
                     name: string;
@@ -192,6 +193,7 @@ export interface Database {
                 };
                 Insert: {
                     id?: string;
+                    chain_id: number;
                     contract_address?: string | null;
                     organizer_address: string;
                     name: string;
@@ -220,6 +222,7 @@ export interface Database {
                 };
                 Update: {
                     id?: string;
+                    chain_id?: number;
                     contract_address?: string | null;
                     organizer_address?: string;
                     name?: string;
@@ -251,6 +254,7 @@ export interface Database {
             marketplace_listings: {
                 Row: {
                     id: string;
+                    chain_id: number;
                     listing_id: string;
                     token_id: string;
                     event_contract_address: string;
@@ -268,6 +272,7 @@ export interface Database {
                 };
                 Insert: {
                     id?: string;
+                    chain_id: number;
                     listing_id: string;
                     token_id: string;
                     event_contract_address: string;
@@ -285,6 +290,7 @@ export interface Database {
                 };
                 Update: {
                     id?: string;
+                    chain_id?: number;
                     listing_id?: string;
                     token_id?: string;
                     event_contract_address?: string;
@@ -305,6 +311,7 @@ export interface Database {
             user_tickets: {
                 Row: {
                     id: string;
+                    chain_id: number;
                     token_id: string;
                     event_contract_address: string;
                     event_id: string | null;
@@ -321,6 +328,7 @@ export interface Database {
                 };
                 Insert: {
                     id?: string;
+                    chain_id: number;
                     token_id: string;
                     event_contract_address: string;
                     event_id?: string | null;
@@ -337,6 +345,7 @@ export interface Database {
                 };
                 Update: {
                     id?: string;
+                    chain_id?: number;
                     token_id?: string;
                     event_contract_address?: string;
                     event_id?: string | null;
@@ -356,6 +365,7 @@ export interface Database {
             transactions: {
                 Row: {
                     id: string;
+                    chain_id: number;
                     tx_hash: string;
                     tx_type: TransactionType;
                     user_address: string;
@@ -372,6 +382,7 @@ export interface Database {
                 };
                 Insert: {
                     id?: string;
+                    chain_id: number;
                     tx_hash: string;
                     tx_type: TransactionType;
                     user_address: string;
@@ -388,6 +399,7 @@ export interface Database {
                 };
                 Update: {
                     id?: string;
+                    chain_id?: number;
                     tx_hash?: string;
                     tx_type?: TransactionType;
                     user_address?: string;
@@ -647,6 +659,7 @@ export interface Database {
             royalty_distributions: {
                 Row: {
                     id: string;
+                    chain_id: number;
                     event_id: string;
                     splitter_address: string;
                     tx_hash: string;
@@ -658,6 +671,7 @@ export interface Database {
                 };
                 Insert: {
                     id?: string;
+                    chain_id: number;
                     event_id: string;
                     splitter_address: string;
                     tx_hash: string;
@@ -669,6 +683,7 @@ export interface Database {
                 };
                 Update: {
                     id?: string;
+                    chain_id?: number;
                     event_id?: string;
                     splitter_address?: string;
                     tx_hash?: string;

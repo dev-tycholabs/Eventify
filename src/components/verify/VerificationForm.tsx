@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { usePublicClient } from "wagmi";
 import { isAddress } from "viem";
-import { EventTicketABI } from "@/hooks/contracts";
+import { verifyTicketMultiChain } from "@/lib/multichain-verify";
 import type { VerificationData } from "@/app/verify/page";
 import { QRScanner } from "./QRScanner";
 
@@ -11,6 +10,7 @@ interface QueryParams {
     contract: string | null;
     tokenId: string | null;
     event: string | null;
+    chainId: string | null;
 }
 
 interface VerificationFormProps {
@@ -33,7 +33,6 @@ export function VerificationForm({
     const [tokenId, setTokenId] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [hasAutoVerified, setHasAutoVerified] = useState(false);
-    const publicClient = usePublicClient();
 
     const validateInputs = useCallback((): boolean => {
         setError(null);
@@ -62,12 +61,7 @@ export function VerificationForm({
         return true;
     }, [eventAddress, tokenId]);
 
-    const verifyTicket = useCallback(async (address: string, token: string) => {
-        if (!publicClient) {
-            setError("Please connect your wallet first");
-            return;
-        }
-
+    const verifyTicket = useCallback(async (address: string, token: string, hintChainId?: number) => {
         if (!isAddress(address)) {
             setError("Invalid event contract address format");
             return;
@@ -80,50 +74,25 @@ export function VerificationForm({
             const tokenIdBigInt = BigInt(token);
             const contractAddress = address as `0x${string}`;
 
-            // Verify ticket
-            const verifyResult = await publicClient.readContract({
-                address: contractAddress,
-                abi: EventTicketABI,
-                functionName: "verifyTicket",
-                args: [tokenIdBigInt],
-            });
-
-            const [isValid, holder, isUsed] = verifyResult as [boolean, `0x${string}`, boolean];
-
-            // Fetch event details for additional context
-            let eventName: string | undefined;
-            let eventVenue: string | undefined;
-            let eventDate: Date | undefined;
-
-            try {
-                const eventDetails = await publicClient.readContract({
-                    address: contractAddress,
-                    abi: EventTicketABI,
-                    functionName: "getEventDetails",
-                });
-
-                const details = eventDetails as [string, string, bigint, bigint, bigint, bigint, `0x${string}`];
-                eventName = details[0];
-                eventVenue = details[1];
-                eventDate = new Date(Number(details[2]) * 1000);
-            } catch {
-                // Event details fetch failed, continue without them
-            }
+            const result = await verifyTicketMultiChain(contractAddress, tokenIdBigInt, hintChainId);
 
             onVerificationComplete({
-                isValid,
-                holder: isValid ? holder : null,
-                isUsed,
-                eventName,
-                eventVenue,
-                eventDate,
+                isValid: result.isValid,
+                holder: result.isValid ? result.holder : null,
+                isUsed: result.isUsed,
+                eventName: result.eventName,
+                eventVenue: result.eventVenue,
+                eventDate: result.eventDate,
                 tokenId: tokenIdBigInt,
                 eventAddress: contractAddress,
+                chainId: result.chainId,
             });
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : String(err);
 
-            if (errorMessage.includes("TicketDoesNotExist") || errorMessage.includes("ERC721NonexistentToken")) {
+            if (errorMessage.includes("TicketNotFoundOnAnyChain")) {
+                setError("Ticket not found on any supported chain. Please check the contract address and token ID.");
+            } else if (errorMessage.includes("TicketDoesNotExist") || errorMessage.includes("ERC721NonexistentToken")) {
                 setError("Ticket does not exist. Please check the token ID.");
             } else if (errorMessage.includes("execution reverted")) {
                 setError("Invalid contract or ticket. Please verify the event address.");
@@ -132,7 +101,7 @@ export function VerificationForm({
             }
             setIsVerifying(false);
         }
-    }, [publicClient, setIsVerifying, onVerificationComplete]);
+    }, [setIsVerifying, onVerificationComplete]);
 
     const handleVerify = useCallback(async () => {
         if (!validateInputs()) return;
@@ -141,20 +110,20 @@ export function VerificationForm({
 
     // Auto-verify when initialParams are provided (from QR code URL)
     useEffect(() => {
-        if (initialParams && initialParams.contract && initialParams.tokenId && !hasAutoVerified && publicClient) {
+        if (initialParams && initialParams.contract && initialParams.tokenId && !hasAutoVerified) {
             setEventAddress(initialParams.contract);
             setTokenId(initialParams.tokenId);
             setMode("manual"); // Switch to manual mode to show the filled form
             setHasAutoVerified(true);
-            // Trigger verification automatically
-            verifyTicket(initialParams.contract, initialParams.tokenId);
+            const hintChainId = initialParams.chainId ? parseInt(initialParams.chainId, 10) : undefined;
+            verifyTicket(initialParams.contract, initialParams.tokenId, hintChainId);
         }
-    }, [initialParams, hasAutoVerified, publicClient, verifyTicket]);
+    }, [initialParams, hasAutoVerified, verifyTicket]);
 
-    const handleQRScanSuccess = useCallback((contract: string, scannedTokenId: string) => {
+    const handleQRScanSuccess = useCallback((contract: string, scannedTokenId: string, chainId?: number) => {
         setEventAddress(contract);
         setTokenId(scannedTokenId);
-        verifyTicket(contract, scannedTokenId);
+        verifyTicket(contract, scannedTokenId, chainId);
     }, [verifyTicket]);
 
     const handleQRError = useCallback((errorMsg: string) => {

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const owner = searchParams.get("owner");
         const eventContract = searchParams.get("event_contract");
+        const chainId = searchParams.get("chain_id") ? parseInt(searchParams.get("chain_id")!) : null;
         const isListed = searchParams.get("is_listed"); // "true", "false", or null for all
         const limit = parseInt(searchParams.get("limit") || "100");
         const offset = parseInt(searchParams.get("offset") || "0");
@@ -59,6 +60,10 @@ export async function GET(request: NextRequest) {
             query = query.eq("event_contract_address", eventContract.toLowerCase());
         }
 
+        if (chainId) {
+            query = query.eq("chain_id", chainId);
+        }
+
         // Filter by listing status
         if (isListed === "true") {
             query = query.eq("is_listed", true);
@@ -69,6 +74,19 @@ export async function GET(request: NextRequest) {
         const { data: tickets, error } = await query;
 
         if (error) throw error;
+
+        // Get total count with same filters
+        const countQuery = supabase
+            .from("user_tickets")
+            .select("id", { count: "exact", head: true })
+            .eq("owner_address", owner.toLowerCase());
+
+        if (eventContract) countQuery.eq("event_contract_address", eventContract.toLowerCase());
+        if (chainId) countQuery.eq("chain_id", chainId);
+        if (isListed === "true") countQuery.eq("is_listed", true);
+        else if (isListed === "false") countQuery.eq("is_listed", false);
+
+        const { count: totalCount } = await countQuery;
 
         const typedTickets = (tickets || []) as TicketWithEvent[];
 
@@ -99,7 +117,7 @@ export async function GET(request: NextRequest) {
             marketplace_listings: t.listing_id ? listingsMap[t.listing_id] || null : null,
         }));
 
-        return NextResponse.json({ tickets: ticketsWithListings });
+        return NextResponse.json({ tickets: ticketsWithListings, totalCount: totalCount ?? 0 });
     } catch (error) {
         console.error("Error fetching tickets:", error);
         return NextResponse.json(
@@ -118,6 +136,7 @@ export async function POST(request: NextRequest) {
             event_contract_address,
             event_id,
             owner_address,
+            chain_id,
             is_used,
             is_listed,
             listing_id,
@@ -126,9 +145,9 @@ export async function POST(request: NextRequest) {
             action, // "mint", "transfer", "use", "list", "unlist"
         } = body;
 
-        if (!token_id || !event_contract_address || !owner_address) {
+        if (!token_id || !event_contract_address || !owner_address || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields" },
+                { error: "Missing required fields (token_id, event_contract_address, owner_address, chain_id)" },
                 { status: 400 }
             );
         }
@@ -138,6 +157,7 @@ export async function POST(request: NextRequest) {
         if (action === "mint" || action === "transfer") {
             // Create or update ticket ownership
             const insertData: InsertTables<"user_tickets"> = {
+                chain_id: chain_id as number,
                 token_id: token_id.toString(),
                 event_contract_address: event_contract_address.toLowerCase(),
                 event_id: event_id || null,
@@ -152,7 +172,7 @@ export async function POST(request: NextRequest) {
             const { data, error } = await supabase
                 .from("user_tickets")
                 .upsert(insertData, {
-                    onConflict: "event_contract_address,token_id",
+                    onConflict: "chain_id,event_contract_address,token_id",
                 })
                 .select()
                 .single();
@@ -198,6 +218,7 @@ export async function POST(request: NextRequest) {
                 .update(updateData)
                 .eq("event_contract_address", event_contract_address.toLowerCase())
                 .eq("token_id", token_id.toString())
+                .eq("chain_id", chain_id)
                 .select()
                 .single();
 
@@ -217,6 +238,7 @@ export async function POST(request: NextRequest) {
                 .update(updateData)
                 .eq("event_contract_address", event_contract_address.toLowerCase())
                 .eq("token_id", token_id.toString())
+                .eq("chain_id", chain_id)
                 .select()
                 .single();
 
@@ -236,6 +258,7 @@ export async function POST(request: NextRequest) {
                 .update(updateData)
                 .eq("event_contract_address", event_contract_address.toLowerCase())
                 .eq("token_id", token_id.toString())
+                .eq("chain_id", chain_id)
                 .select()
                 .single();
 

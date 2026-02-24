@@ -4,13 +4,19 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { formatEther, parseEther } from "viem";
-import { useAccount, useWriteContract, usePublicClient } from "wagmi";
+import { useAccount, useWriteContract, usePublicClient, useSwitchChain } from "wagmi";
 import { EventTicketABI } from "@/hooks/contracts";
 import { syncTicket, syncTransaction } from "@/lib/api/sync";
 import type { Tables } from "@/lib/supabase/types";
 import { txToast } from "@/utils/toast";
 import CommentSection from "@/components/events/CommentSection";
 import ChatRoom from "@/components/events/ChatRoom";
+import { useChainConfig } from "@/hooks/useChainConfig";
+import {
+    getNativeCurrencySymbol,
+    getExplorerUrl,
+    SUPPORTED_CHAINS,
+} from "@/config/chains";
 
 type TransactionStatus = "idle" | "pending" | "success" | "error";
 type DBEvent = Tables<"events">;
@@ -22,6 +28,8 @@ export default function EventDetailsPage() {
     const { isConnected, address } = useAccount();
     const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { switchChainAsync } = useSwitchChain();
+    const { chainId: connectedChainId } = useChainConfig();
 
     const [dbEvent, setDbEvent] = useState<DBEvent | null>(null);
     const [royaltyRecipients, setRoyaltyRecipients] = useState<RoyaltyRecipient[]>([]);
@@ -38,6 +46,17 @@ export default function EventDetailsPage() {
     // Hero image lightbox state
     const [heroLightboxOpen, setHeroLightboxOpen] = useState(false);
     const [heroLightboxImage, setHeroLightboxImage] = useState<string | null>(null);
+
+    // Event's chain info (from DB, not from connected wallet)
+    const eventChainId = dbEvent?.chain_id;
+    const currencySymbol = eventChainId
+        ? getNativeCurrencySymbol(eventChainId)
+        : "ETH";
+    const explorerUrl = eventChainId ? getExplorerUrl(eventChainId) : "";
+    const eventChainName = eventChainId
+        ? SUPPORTED_CHAINS.find((c) => c.id === eventChainId)?.name
+        : undefined;
+    const isWrongChain = eventChainId != null && connectedChainId !== eventChainId;
 
     // Fetch event data from Supabase by ID
     useEffect(() => {
@@ -119,6 +138,17 @@ export default function EventDetailsPage() {
         setTxError(null);
 
         try {
+            // If on wrong chain, prompt wallet to switch first
+            if (isWrongChain && eventChainId) {
+                txToast.pending(`Switching to ${eventChainName}...`);
+                await switchChainAsync({ chainId: eventChainId });
+                // After switch, wagmi re-renders with new publicClient.
+                // We need to bail and let the user click again since
+                // publicClient reference is stale after chain switch.
+                setTxStatus("idle");
+                return;
+            }
+
             txToast.pending("Purchasing ticket...");
 
             let hash: `0x${string}`;
@@ -171,6 +201,7 @@ export default function EventDetailsPage() {
                     purchase_price: ticketPrice.toString(),
                     purchase_tx_hash: hash,
                     action: "mint",
+                    chain_id: eventChainId ?? connectedChainId,
                 });
 
                 await syncTransaction({
@@ -184,6 +215,7 @@ export default function EventDetailsPage() {
                     from_address: "0x0000000000000000000000000000000000000000",
                     to_address: address,
                     tx_timestamp: new Date().toISOString(),
+                    chain_id: eventChainId ?? connectedChainId,
                 });
             }
 
@@ -594,7 +626,7 @@ export default function EventDetailsPage() {
                         {dbEvent.max_resale_price && (
                             <div>
                                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Max Resale Price</p>
-                                <p className="text-white font-medium">{dbEvent.max_resale_price} XTZ</p>
+                                <p className="text-white font-medium">{dbEvent.max_resale_price} {currencySymbol}</p>
                             </div>
                         )}
                         <div>
@@ -658,7 +690,7 @@ export default function EventDetailsPage() {
                         <div>
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Price per ticket</p>
                             <p className="text-2xl font-bold text-white">
-                                {dbEvent.ticket_price || "0"} XTZ
+                                {dbEvent.ticket_price || "0"} {currencySymbol}
                             </p>
                         </div>
                         <div className="text-right">
@@ -708,7 +740,7 @@ export default function EventDetailsPage() {
                         <div className="flex items-center justify-between mb-6 p-4 bg-slate-900/50 rounded-lg">
                             <span className="text-gray-400">Total</span>
                             <span className="text-xl font-bold text-white">
-                                {formatEther(totalPrice)} XTZ
+                                {formatEther(totalPrice)} {currencySymbol}
                             </span>
                         </div>
                     )}
@@ -791,7 +823,9 @@ export default function EventDetailsPage() {
                             disabled={txStatus === "pending"}
                             className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 cursor-pointer"
                         >
-                            {txStatus === "pending" ? "Processing..." : `Buy ${quantity} Ticket${quantity > 1 ? "s" : ""}`}
+                            {txStatus === "pending"
+                                ? "Processing..."
+                                : `Buy ${quantity} Ticket${quantity > 1 ? "s" : ""}`}
                         </button>
                     )}
                 </div>
@@ -802,7 +836,7 @@ export default function EventDetailsPage() {
                         <p className="text-xs text-gray-500">
                             Contract:{" "}
                             <a
-                                href={`https://shadownet.explorer.etherlink.com/address/${contractAddress}`}
+                                href={`${explorerUrl}/address/${contractAddress}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-purple-400 hover:text-purple-300 font-mono"

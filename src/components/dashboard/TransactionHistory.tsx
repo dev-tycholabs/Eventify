@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { usePublicClient } from "wagmi";
 import { formatEther, parseAbiItem } from "viem";
 import { CONTRACT_ADDRESSES } from "@/hooks/contracts";
-
-const EXPLORER_URL = "https://shadownet.explorer.etherlink.com";
+import { useChainConfig } from "@/hooks/useChainConfig";
 
 type TransactionType = "purchase" | "sale" | "transfer" | "listing";
 
@@ -30,6 +29,7 @@ interface TransactionHistoryProps {
 export function TransactionHistory({ address }: TransactionHistoryProps) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { explorerUrl: EXPLORER_URL, currencySymbol } = useChainConfig();
     const publicClient = usePublicClient();
 
     const fetchTransactionHistory = useCallback(async () => {
@@ -354,7 +354,7 @@ export function TransactionHistory({ address }: TransactionHistoryProps) {
                             {tx.amount && (
                                 <span className={`font-semibold ${tx.type === "purchase" ? "text-red-400" : "text-green-400"
                                     }`}>
-                                    {tx.type === "purchase" ? "-" : "+"}{formatEther(tx.amount)} XTZ
+                                    {tx.type === "purchase" ? "-" : "+"}{formatEther(tx.amount)} {currencySymbol}
                                 </span>
                             )}
 

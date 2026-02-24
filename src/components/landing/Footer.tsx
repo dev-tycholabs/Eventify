@@ -116,7 +116,7 @@ export function Footer() {
                 {/* Copyright */}
                 <div className="mt-12 pt-8 border-t border-slate-800">
                     <p className="text-gray-500 text-sm text-center">
-                        © {new Date().getFullYear()} Eventify. All rights reserved. Built on Etherlink.
+                        © {new Date().getFullYear()} Eventify. All rights reserved. Powered by blockchain.
                     </p>
                     <p className="text-gray-500 text-sm text-center mt-2">
                         Built by{" "}

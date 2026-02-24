@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useWriteContract, useAccount, usePublicClient } from "wagmi";
-import { CONTRACT_ADDRESSES, TicketMarketplaceABI, EventTicketABI } from "./contracts";
+import { useWriteContract, useAccount, usePublicClient, useSwitchChain } from "wagmi";
+import { TicketMarketplaceABI, EventTicketABI } from "./contracts";
+import { useChainConfig } from "./useChainConfig";
 import { ErrorCode, type AppError } from "@/types/errors";
 import { txToast } from "@/utils/toast";
 import { syncListing, syncTicket, syncTransaction, findEventIdByContract } from "@/lib/api/sync";
@@ -15,8 +16,29 @@ export function useMarketplace() {
     const [error, setError] = useState<AppError | null>(null);
     const { address, isConnected } = useAccount();
     const publicClient = usePublicClient();
+    const { contracts, currencySymbol, chainId } = useChainConfig();
 
     const { writeContractAsync } = useWriteContract();
+    const { switchChainAsync } = useSwitchChain();
+
+    /**
+     * Prompt the wallet to switch chain if needed.
+     * Returns true if we're now on the right chain, false if user rejected.
+     * If a switch happened, returns 'switched' so callers know to bail
+     * and let wagmi re-render before retrying.
+     */
+    const ensureChain = useCallback(
+        async (targetChainId?: number): Promise<"ok" | "switched" | "rejected"> => {
+            if (!targetChainId || targetChainId === chainId) return "ok";
+            try {
+                await switchChainAsync({ chainId: targetChainId });
+                return "switched";
+            } catch {
+                return "rejected";
+            }
+        },
+        [chainId, switchChainAsync]
+    );
 
 
     // Check price cap for a listing
@@ -30,7 +52,7 @@ export function useMarketplace() {
 
             try {
                 const result = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "checkPriceCap",
                     args: [nftAddress, tokenId, price],
@@ -42,7 +64,7 @@ export function useMarketplace() {
                 return null;
             }
         },
-        [publicClient]
+        [publicClient, contracts]
     );
 
     // List a ticket for sale
@@ -50,7 +72,8 @@ export function useMarketplace() {
         async (
             eventContractAddress: `0x${string}`,
             tokenId: bigint,
-            price: bigint
+            price: bigint,
+            targetChainId?: number
         ): Promise<bigint | null> => {
             if (!isConnected || !address) {
                 setError({
@@ -59,6 +82,10 @@ export function useMarketplace() {
                 });
                 return null;
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return null;
+            if (chainResult === "switched") return null; // re-render needed
 
             if (!publicClient) {
                 setError({
@@ -78,7 +105,7 @@ export function useMarketplace() {
                     const maxPriceFormatted = (Number(priceCheck.maxPrice) / 1e18).toFixed(4);
                     const appError: AppError = {
                         code: ErrorCode.PRICE_EXCEEDS_CAP,
-                        message: `Price exceeds maximum allowed (${maxPriceFormatted} XTZ)`,
+                        message: `Price exceeds maximum allowed (${maxPriceFormatted} ${currencySymbol})`,
                     };
                     setError(appError);
                     txToast.error(appError);
@@ -92,7 +119,7 @@ export function useMarketplace() {
                     address: eventContractAddress,
                     abi: EventTicketABI,
                     functionName: "approve",
-                    args: [CONTRACT_ADDRESSES.TicketMarketplace, tokenId],
+                    args: [contracts!.TicketMarketplace, tokenId],
                 });
 
                 // Wait for approval transaction to be confirmed
@@ -102,7 +129,7 @@ export function useMarketplace() {
 
                 // Then create the listing
                 const listingHash = await writeContractAsync({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "listTicket",
                     args: [eventContractAddress, tokenId, price, NATIVE_CURRENCY],
@@ -121,7 +148,7 @@ export function useMarketplace() {
                 // Try to parse from logs
                 for (const log of receipt.logs) {
                     if (
-                        log.address.toLowerCase() === CONTRACT_ADDRESSES.TicketMarketplace.toLowerCase() &&
+                        log.address.toLowerCase() === contracts!.TicketMarketplace.toLowerCase() &&
                         log.topics[0]?.toLowerCase() === listingCreatedSignature.toLowerCase()
                     ) {
                         // Listing ID is the first indexed topic
@@ -137,7 +164,7 @@ export function useMarketplace() {
 
                     // Re-read listings from contract to find our listing
                     const freshListings = await publicClient.readContract({
-                        address: CONTRACT_ADDRESSES.TicketMarketplace,
+                        address: contracts!.TicketMarketplace,
                         abi: TicketMarketplaceABI,
                         functionName: "getActiveListings",
                         args: [BigInt(0), BigInt(100)],
@@ -181,6 +208,7 @@ export function useMarketplace() {
                             price: price.toString(),
                             tx_hash: listingHash,
                             action: "list",
+                            chain_id: chainId,
                         });
                     }
 
@@ -193,6 +221,7 @@ export function useMarketplace() {
                         is_listed: true,
                         listing_id: listingId?.toString(),
                         action: "list",
+                        chain_id: chainId,
                     });
 
                     // Always sync transaction with real tx hash
@@ -206,6 +235,7 @@ export function useMarketplace() {
                         listing_id: listingId?.toString(),
                         amount: price.toString(),
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 } catch (syncErr) {
                     console.error("Failed to sync listing to database:", syncErr);
@@ -221,13 +251,13 @@ export function useMarketplace() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync, checkPriceCap]
+        [isConnected, address, publicClient, writeContractAsync, checkPriceCap, contracts, chainId, ensureChain]
     );
 
 
     // Buy a listed ticket
     const buyTicket = useCallback(
-        async (listingId: bigint, price: bigint): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
+        async (listingId: bigint, price: bigint, targetChainId?: number): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
                     code: ErrorCode.WALLET_NOT_CONNECTED,
@@ -235,6 +265,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false }; // re-render needed
 
             if (!publicClient) {
                 setError({
@@ -251,7 +285,7 @@ export function useMarketplace() {
                 txToast.pending("Purchasing ticket...");
 
                 const txHash = await writeContractAsync({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "buyTicket",
                     args: [listingId, BigInt(0)], // amountFromBalance = 0, pay full price
@@ -273,12 +307,12 @@ export function useMarketplace() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync]
+        [isConnected, address, publicClient, writeContractAsync, ensureChain]
     );
 
     // Cancel a listing
     const cancelListing = useCallback(
-        async (listingId: bigint): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
+        async (listingId: bigint, targetChainId?: number): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
                     code: ErrorCode.WALLET_NOT_CONNECTED,
@@ -286,6 +320,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false };
 
             if (!publicClient) {
                 setError({
@@ -302,7 +340,7 @@ export function useMarketplace() {
                 txToast.pending("Cancelling listing...");
 
                 const txHash = await writeContractAsync({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "cancelListing",
                     args: [listingId],
@@ -331,7 +369,8 @@ export function useMarketplace() {
         async (
             eventContractAddress: `0x${string}`,
             tokenId: bigint,
-            toAddress: `0x${string}`
+            toAddress: `0x${string}`,
+            targetChainId?: number
         ): Promise<{ success: boolean; txHash?: `0x${string}` }> => {
             if (!isConnected || !address) {
                 setError({
@@ -340,6 +379,10 @@ export function useMarketplace() {
                 });
                 return { success: false };
             }
+
+            const chainResult = await ensureChain(targetChainId);
+            if (chainResult === "rejected") return { success: false };
+            if (chainResult === "switched") return { success: false };
 
             if (!publicClient) {
                 setError({
@@ -386,6 +429,7 @@ export function useMarketplace() {
                         event_id: eventId || undefined,
                         owner_address: toAddress,
                         action: "transfer",
+                        chain_id: chainId,
                     });
 
                     // Record transaction for sender
@@ -399,6 +443,7 @@ export function useMarketplace() {
                         from_address: address,
                         to_address: toAddress,
                         tx_timestamp: new Date().toISOString(),
+                        chain_id: chainId,
                     });
                 } catch (syncErr) {
                     console.error("Failed to sync transfer to database:", syncErr);
@@ -428,7 +473,7 @@ export function useMarketplace() {
 
             try {
                 const balance = await publicClient.readContract({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "claimableFunds",
                     args: [addressToCheck, NATIVE_CURRENCY],
@@ -439,7 +484,7 @@ export function useMarketplace() {
                 return BigInt(0);
             }
         },
-        [publicClient, address]
+        [publicClient, address, contracts]
     );
 
     // Claim funds from marketplace sales
@@ -478,7 +523,7 @@ export function useMarketplace() {
                 txToast.pending("Claiming funds...");
 
                 const txHash = await writeContractAsync({
-                    address: CONTRACT_ADDRESSES.TicketMarketplace,
+                    address: contracts!.TicketMarketplace,
                     abi: TicketMarketplaceABI,
                     functionName: "claimFunds",
                     args: [NATIVE_CURRENCY],
@@ -499,7 +544,7 @@ export function useMarketplace() {
                 setIsLoading(false);
             }
         },
-        [isConnected, address, publicClient, writeContractAsync, getClaimableBalance]
+        [isConnected, address, publicClient, writeContractAsync, getClaimableBalance, contracts]
     );
 
     return {

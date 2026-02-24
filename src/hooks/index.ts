@@ -5,5 +5,6 @@ export { useMarketplaceListings } from "./useMarketplaceListings";
 export { useOrganizerEvents, type OrganizerEvent } from "./useOrganizerEvents";
 export { useOrganizerEventsFromDB, type OrganizerEventFromDB } from "./useOrganizerEventsFromDB";
 export { CONTRACT_ADDRESSES } from "./contracts";
+export { useChainConfig } from "./useChainConfig";
 export { useGeolocation, type GeolocationState } from "./useGeolocation";
 export { useSupabase } from "./useSupabase";
