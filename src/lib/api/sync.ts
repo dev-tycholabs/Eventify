@@ -43,9 +43,12 @@ interface SyncTransactionParams {
     chain_id: number;
 }
 
-export async function syncListing(params: SyncListingParams): Promise<boolean> {
+type AuthFetchFn = (url: string, options?: RequestInit) => Promise<Response>;
+
+export async function syncListing(params: SyncListingParams, authFetch?: AuthFetchFn): Promise<boolean> {
     try {
-        const response = await fetch("/api/marketplace", {
+        const fetchFn = authFetch || fetch;
+        const response = await fetchFn("/api/marketplace", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(params),
@@ -63,9 +66,10 @@ export async function syncListing(params: SyncListingParams): Promise<boolean> {
     }
 }
 
-export async function syncTicket(params: SyncTicketParams): Promise<boolean> {
+export async function syncTicket(params: SyncTicketParams, authFetch?: AuthFetchFn): Promise<boolean> {
     try {
-        const response = await fetch("/api/tickets", {
+        const fetchFn = authFetch || fetch;
+        const response = await fetchFn("/api/tickets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(params),
@@ -83,9 +87,10 @@ export async function syncTicket(params: SyncTicketParams): Promise<boolean> {
     }
 }
 
-export async function syncTransaction(params: SyncTransactionParams): Promise<boolean> {
+export async function syncTransaction(params: SyncTransactionParams, authFetch?: AuthFetchFn): Promise<boolean> {
     try {
-        const response = await fetch("/api/transactions", {
+        const fetchFn = authFetch || fetch;
+        const response = await fetchFn("/api/transactions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(params),
@@ -103,7 +108,7 @@ export async function syncTransaction(params: SyncTransactionParams): Promise<bo
     }
 }
 
-// Helper to find event_id from contract address
+// Helper to find event_id from contract address (public GET — no auth needed)
 export async function findEventIdByContract(contractAddress: string): Promise<string | null> {
     try {
         const response = await fetch(

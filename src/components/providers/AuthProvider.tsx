@@ -6,10 +6,13 @@ import {
     useEffect,
     useState,
     useCallback,
+    useRef,
     ReactNode,
 } from "react";
 import { useAccount, useSignMessage, useDisconnect } from "wagmi";
+import { SiweMessage } from "siwe";
 import type { Tables } from "@/lib/supabase/types";
+import { notify } from "@/utils/toast";
 
 type User = Tables<"users">;
 
@@ -17,169 +20,218 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isAuthenticating: boolean;
+    accessToken: string | null;
     signIn: () => Promise<boolean>;
     signOut: () => void;
     updateProfile: (data: Partial<User>) => Promise<User | null>;
+    getAccessToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const AUTH_STORAGE_KEY = "eventify_auth";
-
-interface StoredAuth {
-    address: string;
-    signature: string;
-    message: string;
-    timestamp: number;
-}
+// Token refresh buffer — refresh 2 minutes before expiry
+const REFRESH_BUFFER_MS = 2 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, chainId } = useAccount();
     const { signMessageAsync } = useSignMessage();
     const { disconnect } = useDisconnect();
 
     const [user, setUser] = useState<User | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
     const [isAuthenticating, setIsAuthenticating] = useState(false);
     const [hasPrompted, setHasPrompted] = useState(false);
+    const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Check if we have a valid stored auth session
-    const getStoredAuth = useCallback((): StoredAuth | null => {
-        if (typeof window === "undefined") return null;
+    // Parse JWT expiry from the token payload
+    const getTokenExpiry = useCallback((token: string): number | null => {
         try {
-            const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-            if (!stored) return null;
-
-            const auth: StoredAuth = JSON.parse(stored);
-            // Check if auth is for current address and not expired (24 hours)
-            const isValid =
-                auth.address?.toLowerCase() === address?.toLowerCase() &&
-                Date.now() - auth.timestamp < 24 * 60 * 60 * 1000;
-
-            return isValid ? auth : null;
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            return payload.exp ? payload.exp * 1000 : null;
         } catch {
             return null;
         }
-    }, [address]);
+    }, []);
 
-    // Store auth session
-    const storeAuth = useCallback(
-        (signature: string, message: string) => {
-            if (!address) return;
-            const auth: StoredAuth = {
-                address,
-                signature,
-                message,
-                timestamp: Date.now(),
-            };
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    // Schedule automatic token refresh
+    const scheduleRefresh = useCallback(
+        (token: string) => {
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
+
+            const expiry = getTokenExpiry(token);
+            if (!expiry) return;
+
+            const refreshIn = expiry - Date.now() - REFRESH_BUFFER_MS;
+            if (refreshIn <= 0) return;
+
+            refreshTimerRef.current = setTimeout(async () => {
+                try {
+                    const res = await fetch("/api/auth/refresh", {
+                        method: "POST",
+                        credentials: "include",
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        setAccessToken(data.accessToken);
+                        if (data.user) setUser(data.user);
+                        scheduleRefresh(data.accessToken);
+                    } else {
+                        // Refresh failed — clear auth state
+                        setAccessToken(null);
+                        setUser(null);
+                    }
+                } catch {
+                    setAccessToken(null);
+                    setUser(null);
+                }
+            }, refreshIn);
         },
-        [address]
+        [getTokenExpiry]
     );
 
-    // Clear auth session
-    const clearAuth = useCallback(() => {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        setUser(null);
-        setHasPrompted(false);
-    }, []);
-
-    // Fetch user from API
-    const fetchUser = useCallback(async (walletAddress: string): Promise<User | null> => {
-        try {
-            const res = await fetch(`/api/users?address=${walletAddress}`);
-            const data = await res.json();
-            return data.user || null;
-        } catch {
-            return null;
+    // Get a valid access token, refreshing if needed
+    const getAccessToken = useCallback(async (): Promise<string | null> => {
+        if (accessToken) {
+            const expiry = getTokenExpiry(accessToken);
+            if (expiry && expiry - Date.now() > REFRESH_BUFFER_MS) {
+                return accessToken;
+            }
         }
-    }, []);
 
-    // Sign in - prompts wallet signature and creates/fetches user
+        // Try to refresh
+        try {
+            const res = await fetch("/api/auth/refresh", {
+                method: "POST",
+                credentials: "include",
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setAccessToken(data.accessToken);
+                if (data.user) setUser(data.user);
+                scheduleRefresh(data.accessToken);
+                return data.accessToken;
+            }
+        } catch {
+            // Refresh failed
+        }
+
+        return null;
+    }, [accessToken, getTokenExpiry, scheduleRefresh]);
+
+    // Sign in with SIWE
     const signIn = useCallback(async (): Promise<boolean> => {
-        if (!address || isAuthenticating) return false;
+        if (!address || !chainId || isAuthenticating) return false;
 
         setIsAuthenticating(true);
 
         try {
-            // Check for existing valid session first
-            const storedAuth = getStoredAuth();
-            if (storedAuth) {
-                const existingUser = await fetchUser(address);
-                if (existingUser) {
-                    setUser(existingUser);
-                    setIsAuthenticating(false);
-                    return true;
-                }
-            }
+            // 1. Get nonce from server
+            const nonceRes = await fetch(`/api/auth/nonce?address=${address}`);
+            if (!nonceRes.ok) throw new Error("Failed to get nonce");
+            const { nonce } = await nonceRes.json();
 
-            // Create sign message
-            const message = `Welcome to Eventify!\n\nSign this message to verify your wallet and access your account.\n\nWallet: ${address}\nTimestamp: ${Date.now()}`;
+            // 2. Build SIWE message
+            const siweMessage = new SiweMessage({
+                domain: window.location.host,
+                address,
+                statement: "Sign in to Eventify to verify your wallet and access your account.",
+                uri: window.location.origin,
+                version: "1",
+                chainId,
+                nonce,
+                issuedAt: new Date().toISOString(),
+            });
 
-            // Request signature
-            const signature = await signMessageAsync({ message });
+            const messageToSign = siweMessage.prepareMessage();
 
-            // Store auth locally
-            storeAuth(signature, message);
+            // 3. Request wallet signature
+            const signature = await signMessageAsync({ message: messageToSign });
 
-            // Register/fetch user via API
-            const res = await fetch("/api/users", {
+            // 4. Send to server for verification + JWT issuance
+            const loginRes = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({
-                    address,
+                    message: messageToSign,
                     signature,
-                    message,
                 }),
             });
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Authentication failed");
+            if (!loginRes.ok) {
+                const err = await loginRes.json();
+                throw new Error(err.error || "Authentication failed");
             }
 
+            const data = await loginRes.json();
+
             setUser(data.user);
+            setAccessToken(data.accessToken);
+            scheduleRefresh(data.accessToken);
+
             return true;
         } catch (error) {
-            console.error("Sign in failed:", error);
-            clearAuth();
+            setUser(null);
+            setAccessToken(null);
+
+            // If user rejected the signature request, disconnect the wallet
+            const isUserRejection =
+                error instanceof Error &&
+                (error.name === "UserRejectedRequestError" ||
+                    error.message.toLowerCase().includes("user rejected"));
+
+            if (isUserRejection) {
+                notify.warning("Sign-in cancelled. Wallet disconnected.");
+                disconnect();
+            } else {
+                notify.error("Sign-in failed. Please try again.");
+            }
+
             return false;
         } finally {
             setIsAuthenticating(false);
         }
-    }, [address, isAuthenticating, getStoredAuth, fetchUser, signMessageAsync, storeAuth, clearAuth]);
+    }, [address, chainId, isAuthenticating, signMessageAsync, scheduleRefresh]);
 
     // Sign out
-    const signOut = useCallback(() => {
-        clearAuth();
+    const signOut = useCallback(async () => {
+        try {
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                credentials: "include",
+            });
+        } catch {
+            // Best effort
+        }
+
+        if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+        }
+
+        setUser(null);
+        setAccessToken(null);
+        setHasPrompted(false);
         disconnect();
-    }, [clearAuth, disconnect]);
+    }, [disconnect]);
 
     // Update user profile
     const updateProfile = useCallback(
         async (data: Partial<User>): Promise<User | null> => {
-            if (!address) return null;
-
-            const storedAuth = getStoredAuth();
-            if (!storedAuth) {
-                // Need to re-authenticate
-                const success = await signIn();
-                if (!success) return null;
-            }
-
-            const auth = getStoredAuth();
-            if (!auth) return null;
+            const token = await getAccessToken();
+            if (!token || !address) return null;
 
             try {
                 const res = await fetch("/api/users", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        address,
-                        signature: auth.signature,
-                        message: auth.message,
-                        ...data,
-                    }),
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(data),
                 });
 
                 const result = await res.json();
@@ -195,52 +247,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return null;
             }
         },
-        [address, getStoredAuth, signIn]
+        [address, getAccessToken]
     );
 
-    // Auto sign-in when wallet connects
+    // Auto sign-in: try refresh first, then prompt signature
     useEffect(() => {
         if (!isConnected || !address) {
-            clearAuth();
+            // Call logout API to revoke refresh tokens and clear cookie
+            if (user || accessToken) {
+                fetch("/api/auth/logout", {
+                    method: "POST",
+                    credentials: "include",
+                }).catch(() => {
+                    // Best effort — still clear local state
+                });
+            }
+
+            setUser(null);
+            setAccessToken(null);
+            setHasPrompted(false);
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
             return;
         }
 
-        // Check if already authenticated
-        const storedAuth = getStoredAuth();
-        if (storedAuth && !user) {
-            // Try to restore session
-            fetchUser(address).then((existingUser) => {
-                if (existingUser) {
-                    setUser(existingUser);
-                } else if (!hasPrompted) {
-                    // User doesn't exist, prompt sign in
-                    setHasPrompted(true);
-                    signIn();
-                }
-            });
-        } else if (!storedAuth && !hasPrompted && !isAuthenticating) {
-            // No stored auth, prompt sign in
-            setHasPrompted(true);
-            signIn();
-        }
-    }, [isConnected, address, user, hasPrompted, isAuthenticating, getStoredAuth, fetchUser, signIn, clearAuth]);
+        if (user || isAuthenticating) return;
 
-    // Clear auth when wallet disconnects
+        // Try to restore session via refresh token
+        const tryRestore = async () => {
+            try {
+                const res = await fetch("/api/auth/refresh", {
+                    method: "POST",
+                    credentials: "include",
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setUser(data.user);
+                    setAccessToken(data.accessToken);
+                    scheduleRefresh(data.accessToken);
+                    return;
+                }
+            } catch {
+                // Refresh failed
+            }
+
+            // No valid session — prompt sign in
+            if (!hasPrompted) {
+                setHasPrompted(true);
+                signIn();
+            }
+        };
+
+        tryRestore();
+    }, [isConnected, address, user, hasPrompted, isAuthenticating, signIn, scheduleRefresh]);
+
+    // Cleanup on unmount
     useEffect(() => {
-        if (!isConnected) {
-            clearAuth();
-        }
-    }, [isConnected, clearAuth]);
+        return () => {
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
+        };
+    }, []);
 
     return (
         <AuthContext.Provider
             value={{
                 user,
-                isAuthenticated: !!user,
+                isAuthenticated: !!user && !!accessToken,
                 isAuthenticating,
+                accessToken,
                 signIn,
                 signOut,
                 updateProfile,
+                getAccessToken,
             }}
         >
             {children}

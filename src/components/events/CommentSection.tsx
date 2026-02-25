@@ -26,7 +26,7 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ eventId, preview = false }: CommentSectionProps) {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, getAccessToken } = useAuth();
     const { address } = useAccount();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState("");
@@ -64,12 +64,17 @@ export default function CommentSection({ eventId, preview = false }: CommentSect
         setError(null);
 
         try {
+            const token = await getAccessToken();
+            if (!token) throw new Error("Not authenticated");
+
             const res = await fetch("/api/comments", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({
                     event_id: eventId,
-                    user_address: address.toLowerCase(),
                     content: newComment.trim(),
                 }),
             });
@@ -93,9 +98,15 @@ export default function CommentSection({ eventId, preview = false }: CommentSect
         if (!address || preview) return;
 
         try {
+            const token = await getAccessToken();
+            if (!token) return;
+
             const res = await fetch(
-                `/api/comments?id=${commentId}&user_address=${address.toLowerCase()}`,
-                { method: "DELETE" }
+                `/api/comments?id=${commentId}`,
+                {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${token}` },
+                }
             );
 
             if (res.ok) {

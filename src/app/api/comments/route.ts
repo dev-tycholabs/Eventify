@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 
-// GET /api/comments?event_id=...
+// GET /api/comments?event_id=... (public)
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
-        // Fetch user info for each unique address
         const addresses = [...new Set((data || []).map((c) => c.user_address))];
         const { data: users } = await supabase
             .from("users")
@@ -44,15 +43,21 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST /api/comments - Create a comment
+// POST /api/comments - Create a comment (JWT protected via middleware)
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { event_id, user_address, content } = body;
+        const address = request.headers.get("x-auth-address");
 
-        if (!event_id || !user_address || !content?.trim()) {
+        if (!address) {
+            return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { event_id, content } = body;
+
+        if (!event_id || !content?.trim()) {
             return NextResponse.json(
-                { error: "event_id, user_address, and content are required" },
+                { error: "event_id and content are required" },
                 { status: 400 }
             );
         }
@@ -66,22 +71,11 @@ export async function POST(request: NextRequest) {
 
         const supabase = createServerClient();
 
-        // Verify user exists
-        const { data: user } = await supabase
-            .from("users")
-            .select("wallet_address")
-            .eq("wallet_address", user_address.toLowerCase())
-            .single();
-
-        if (!user) {
-            return NextResponse.json({ error: "User not found. Please sign in first." }, { status: 401 });
-        }
-
         const { data, error } = await supabase
             .from("comments")
             .insert({
                 event_id,
-                user_address: user_address.toLowerCase(),
+                user_address: address.toLowerCase(),
                 content: content.trim(),
             })
             .select()
@@ -89,11 +83,10 @@ export async function POST(request: NextRequest) {
 
         if (error) throw error;
 
-        // Fetch user info for the response
         const { data: userData } = await supabase
             .from("users")
             .select("wallet_address, username, name, avatar_url")
-            .eq("wallet_address", user_address.toLowerCase())
+            .eq("wallet_address", address.toLowerCase())
             .single();
 
         return NextResponse.json({
@@ -105,18 +98,20 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// DELETE /api/comments?id=...&user_address=...
+// DELETE /api/comments?id=... (JWT protected via middleware)
 export async function DELETE(request: NextRequest) {
     try {
+        const address = request.headers.get("x-auth-address");
+
+        if (!address) {
+            return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get("id");
-        const userAddress = searchParams.get("user_address");
 
-        if (!id || !userAddress) {
-            return NextResponse.json(
-                { error: "id and user_address are required" },
-                { status: 400 }
-            );
+        if (!id) {
+            return NextResponse.json({ error: "Comment id is required" }, { status: 400 });
         }
 
         const supabase = createServerClient();
@@ -132,7 +127,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: "Comment not found" }, { status: 404 });
         }
 
-        if (comment.user_address !== userAddress.toLowerCase()) {
+        if (comment.user_address !== address.toLowerCase()) {
             return NextResponse.json({ error: "Not authorized" }, { status: 403 });
         }
 

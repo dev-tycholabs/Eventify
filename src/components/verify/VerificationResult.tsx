@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { createPublicClient, http } from "viem";
 import { EventTicketABI } from "@/hooks/contracts";
+import { useAuth } from "@/components/providers/AuthProvider";
 import type { VerificationData } from "@/app/verify/page";
 import { SUPPORTED_CHAINS, getExplorerUrl } from "@/config/chains";
 
@@ -15,6 +16,7 @@ interface VerificationResultProps {
 export function VerificationResult({ result, onReset }: VerificationResultProps) {
     const { isValid, holder, isUsed, eventName, eventVenue, eventDate, tokenId, eventAddress, chainId: ticketChainId } = result;
     const { address, isConnected, chain: walletChain } = useAccount();
+    const { getAccessToken } = useAuth();
     const explorerUrl = getExplorerUrl(ticketChainId);
 
     // Get a public client for the ticket's chain (not the wallet's chain)
@@ -76,10 +78,14 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
 
     const syncTicketUsageToSupabase = async (txHash: string) => {
         try {
+            const token = await getAccessToken();
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
             // Update ticket status in Supabase
             await fetch("/api/tickets", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({
                     token_id: tokenId.toString(),
                     event_contract_address: eventAddress,
@@ -92,7 +98,7 @@ export function VerificationResult({ result, onReset }: VerificationResultProps)
             // Record the transaction for history
             await fetch("/api/transactions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({
                     tx_hash: txHash,
                     tx_type: "use",

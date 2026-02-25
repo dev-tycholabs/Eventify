@@ -54,7 +54,7 @@ export default function EventChatPage() {
     const params = useParams();
     const router = useRouter();
     const activeEventId = params.id as string;
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, getAccessToken } = useAuth();
     const { address } = useAccount();
 
     // Sidebar state
@@ -298,9 +298,12 @@ export default function EventChatPage() {
         if (!address) return;
         setContextMenuMsg(null);
         try {
+            const token = await getAccessToken();
+            if (!token) { setErrorMsg("Not authenticated"); return; }
+
             const res = await fetch("/api/chat", {
                 method: "DELETE",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ message_id: messageId, user_address: address.toLowerCase(), mode }),
             });
             if (!res.ok) {
@@ -331,9 +334,12 @@ export default function EventChatPage() {
             if (content === editingMessage.content) { handleCancelEdit(); return; }
             setIsSending(true);
             try {
+                const token = await getAccessToken();
+                if (!token) throw new Error("Not authenticated");
+
                 const res = await fetch("/api/chat", {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                     body: JSON.stringify({ message_id: editingMessage.id, user_address: address.toLowerCase(), content }),
                 });
                 const data = await res.json();
@@ -363,7 +369,10 @@ export default function EventChatPage() {
         inputRef.current?.focus();
         setIsSending(true);
         try {
-            const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_id: activeEventId, user_address: address.toLowerCase(), content, reply_to: replyingTo?.id || undefined }) });
+            const token = await getAccessToken();
+            if (!token) { setMessages((prev) => prev.filter((m) => m.id !== tempId)); throw new Error("Not authenticated"); }
+
+            const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ event_id: activeEventId, user_address: address.toLowerCase(), content, reply_to: replyingTo?.id || undefined }) });
             const data = await res.json();
             if (!res.ok) { setMessages((prev) => prev.filter((m) => m.id !== tempId)); throw new Error(data.error || "Failed to send"); }
             setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...data.message, pending: false } : m)));

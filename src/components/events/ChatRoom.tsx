@@ -49,7 +49,7 @@ export default function ChatRoom({
     organizerAddress,
 }: ChatRoomProps) {
     const router = useRouter();
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, getAccessToken } = useAuth();
     const { address } = useAccount();
 
     const [chatState, setChatState] = useState<ChatState>("closed");
@@ -311,9 +311,12 @@ export default function ChatRoom({
         if (!address) return;
         setContextMenuMsg(null);
         try {
+            const token = await getAccessToken();
+            if (!token) { setErrorMsg("Not authenticated"); return; }
+
             const res = await fetch("/api/chat", {
                 method: "DELETE",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ message_id: messageId, user_address: address.toLowerCase(), mode }),
             });
             if (!res.ok) {
@@ -344,9 +347,12 @@ export default function ChatRoom({
             if (content === editingMessage.content) { handleCancelEdit(); return; }
             setIsSending(true);
             try {
+                const token = await getAccessToken();
+                if (!token) throw new Error("Not authenticated");
+
                 const res = await fetch("/api/chat", {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                     body: JSON.stringify({ message_id: editingMessage.id, user_address: address.toLowerCase(), content }),
                 });
                 const data = await res.json();
@@ -376,8 +382,11 @@ export default function ChatRoom({
         inputRef.current?.focus();
         setIsSending(true);
         try {
+            const token = await getAccessToken();
+            if (!token) { setMessages((prev) => prev.filter((m) => m.id !== tempId)); throw new Error("Not authenticated"); }
+
             const res = await fetch("/api/chat", {
-                method: "POST", headers: { "Content-Type": "application/json" },
+                method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ event_id: eventId, user_address: address.toLowerCase(), content, reply_to: replyingTo?.id || undefined }),
             });
             const data = await res.json();
