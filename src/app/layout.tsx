@@ -5,6 +5,7 @@ import { cookieToInitialState } from "wagmi";
 import { serverConfig } from "@/config/wagmi-server";
 import { Web3Provider } from "@/components/providers/Web3Provider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { CircleAuthProvider } from "@/components/providers/CircleAuthProvider";
 import { ErrorBoundary, ToastProvider, Header, GeolocationProvider } from "@/components";
 import "./globals.css";
 
@@ -39,11 +40,13 @@ export default async function RootLayout({
       >
         <Web3Provider initialState={initialState}>
           <AuthProvider>
-            <GeolocationProvider>
-              <Header />
-              <ErrorBoundary>{children}</ErrorBoundary>
-              <ToastProvider />
-            </GeolocationProvider>
+            <CircleAuthProvider>
+              <GeolocationProvider>
+                <Header />
+                <ErrorBoundary>{children}</ErrorBoundary>
+                <ToastProvider />
+              </GeolocationProvider>
+            </CircleAuthProvider>
           </AuthProvider>
         </Web3Provider>
       </body>
