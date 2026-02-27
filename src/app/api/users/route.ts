@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { verifyWalletSignature } from "@/lib/auth/verify-wallet";
 
 // GET /api/users?address=0x... or GET /api/users?username=...
 export async function GET(request: NextRequest) {
@@ -29,7 +28,6 @@ export async function GET(request: NextRequest) {
         const { data, error } = await query.single();
 
         if (error && error.code !== "PGRST116") {
-            // PGRST116 = no rows returned
             throw error;
         }
 
@@ -43,33 +41,21 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST /api/users - Create or update user profile
+// POST /api/users - Update user profile (JWT protected via middleware)
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { address, signature, message, username, name, email, contact_number, bio, avatar_url } = body;
+        // Address comes from JWT via middleware
+        const address = request.headers.get("x-auth-address");
 
-        // Validate required fields
-        if (!address || !signature || !message) {
+        if (!address) {
             return NextResponse.json(
-                { error: "Address, signature, and message are required" },
-                { status: 400 }
-            );
-        }
-
-        // Verify wallet ownership
-        const isValid = await verifyWalletSignature({
-            address,
-            message,
-            signature,
-        });
-
-        if (!isValid) {
-            return NextResponse.json(
-                { error: "Invalid signature" },
+                { error: "Authentication required" },
                 { status: 401 }
             );
         }
+
+        const body = await request.json();
+        const { username, name, email, contact_number, bio, avatar_url } = body;
 
         const supabase = createServerClient();
 
@@ -89,7 +75,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Upsert user (create if not exists, update if exists)
+        // Upsert user
         const { data, error } = await supabase
             .from("users")
             .upsert(
@@ -103,9 +89,7 @@ export async function POST(request: NextRequest) {
                     avatar_url,
                     updated_at: new Date().toISOString(),
                 },
-                {
-                    onConflict: "wallet_address",
-                }
+                { onConflict: "wallet_address" }
             )
             .select()
             .single();

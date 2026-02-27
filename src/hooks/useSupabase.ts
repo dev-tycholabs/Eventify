@@ -2,47 +2,40 @@
 
 import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { useChainConfig } from "./useChainConfig";
 import type { Tables, InsertTables, EventStatus } from "@/lib/supabase/types";
 
 type User = Tables<"users">;
 type Event = Tables<"events">;
 
-const AUTH_STORAGE_KEY = "eventify_auth";
-
-interface StoredAuth {
-    address: string;
-    signature: string;
-    message: string;
-    timestamp: number;
-}
-
 export function useSupabase() {
     const { address } = useAccount();
+    const { getAccessToken } = useAuth();
     const { chainId } = useChainConfig();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Helper to get stored auth from initial wallet connection
-    const getStoredAuth = useCallback((): StoredAuth | null => {
-        if (typeof window === "undefined" || !address) return null;
-        try {
-            const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-            if (!stored) return null;
+    // Helper to make authenticated requests
+    const authFetch = useCallback(
+        async (url: string, options: RequestInit = {}): Promise<Response> => {
+            const token = await getAccessToken();
+            if (!token) {
+                throw new Error("Not authenticated. Please sign in.");
+            }
 
-            const auth: StoredAuth = JSON.parse(stored);
-            // Check if auth is for current address and not expired (24 hours)
-            const isValid =
-                auth.address?.toLowerCase() === address?.toLowerCase() &&
-                Date.now() - auth.timestamp < 24 * 60 * 60 * 1000;
+            const headers = new Headers(options.headers);
+            headers.set("Authorization", `Bearer ${token}`);
+            if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
+                headers.set("Content-Type", "application/json");
+            }
 
-            return isValid ? auth : null;
-        } catch {
-            return null;
-        }
-    }, [address]);
+            return fetch(url, { ...options, headers });
+        },
+        [getAccessToken]
+    );
 
-    // Fetch user profile
+    // Fetch user profile (public — no auth needed)
     const getUser = useCallback(
         async (walletAddress?: string): Promise<User | null> => {
             const addr = walletAddress || address;
@@ -60,7 +53,7 @@ export function useSupabase() {
         [address]
     );
 
-    // Create or update user profile
+    // Create or update user profile (authenticated)
     const saveUser = useCallback(
         async (userData: {
             username?: string;
@@ -75,25 +68,13 @@ export function useSupabase() {
                 return null;
             }
 
-            const storedAuth = getStoredAuth();
-            if (!storedAuth) {
-                setError("Please reconnect your wallet");
-                return null;
-            }
-
             setIsLoading(true);
             setError(null);
 
             try {
-                const res = await fetch("/api/users", {
+                const res = await authFetch("/api/users", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        address,
-                        message: storedAuth.message,
-                        signature: storedAuth.signature,
-                        ...userData,
-                    }),
+                    body: JSON.stringify(userData),
                 });
 
                 const data = await res.json();
@@ -104,18 +85,17 @@ export function useSupabase() {
 
                 return data.user;
             } catch (err) {
-                const msg =
-                    err instanceof Error ? err.message : "Failed to save user";
+                const msg = err instanceof Error ? err.message : "Failed to save user";
                 setError(msg);
                 return null;
             } finally {
                 setIsLoading(false);
             }
         },
-        [address, getStoredAuth]
+        [address, authFetch]
     );
 
-    // Fetch events
+    // Fetch events (public)
     const getEvents = useCallback(
         async (options?: {
             organizer?: string;
@@ -150,7 +130,7 @@ export function useSupabase() {
         return getEvents({ organizer: address, status: "published" });
     }, [address, getEvents]);
 
-    // Save event (create or update)
+    // Save event (authenticated)
     const saveEvent = useCallback(
         async (
             eventData: Partial<InsertTables<"events">> & { name: string },
@@ -161,23 +141,13 @@ export function useSupabase() {
                 return null;
             }
 
-            const storedAuth = getStoredAuth();
-            if (!storedAuth) {
-                setError("Please reconnect your wallet");
-                return null;
-            }
-
             setIsLoading(true);
             setError(null);
 
             try {
-                const res = await fetch("/api/events", {
+                const res = await authFetch("/api/events", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        address,
-                        message: storedAuth.message,
-                        signature: storedAuth.signature,
                         event_id: eventId,
                         chain_id: eventData.chain_id ?? chainId,
                         ...eventData,
@@ -192,15 +162,14 @@ export function useSupabase() {
 
                 return data.event;
             } catch (err) {
-                const msg =
-                    err instanceof Error ? err.message : "Failed to save event";
+                const msg = err instanceof Error ? err.message : "Failed to save event";
                 setError(msg);
                 return null;
             } finally {
                 setIsLoading(false);
             }
         },
-        [address, getStoredAuth, chainId]
+        [address, authFetch, chainId]
     );
 
     // Save as draft
@@ -214,7 +183,7 @@ export function useSupabase() {
         [saveEvent]
     );
 
-    // Publish event (update status to published)
+    // Publish event
     const publishEvent = useCallback(
         async (
             eventData: Partial<InsertTables<"events">> & { name: string },
@@ -225,7 +194,7 @@ export function useSupabase() {
         [saveEvent]
     );
 
-    // Delete draft
+    // Delete draft (authenticated)
     const deleteDraft = useCallback(
         async (eventId: string): Promise<boolean> => {
             if (!address) {
@@ -233,24 +202,12 @@ export function useSupabase() {
                 return false;
             }
 
-            const storedAuth = getStoredAuth();
-            if (!storedAuth) {
-                setError("Please reconnect your wallet");
-                return false;
-            }
-
             setIsLoading(true);
             setError(null);
 
             try {
-                const params = new URLSearchParams({
-                    id: eventId,
-                    address,
-                    message: storedAuth.message,
-                    signature: storedAuth.signature,
-                });
-
-                const res = await fetch(`/api/events?${params}`, {
+                const params = new URLSearchParams({ id: eventId });
+                const res = await authFetch(`/api/events?${params}`, {
                     method: "DELETE",
                 });
 
@@ -261,24 +218,22 @@ export function useSupabase() {
 
                 return true;
             } catch (err) {
-                const msg =
-                    err instanceof Error ? err.message : "Failed to delete draft";
+                const msg = err instanceof Error ? err.message : "Failed to delete draft";
                 setError(msg);
                 return false;
             } finally {
                 setIsLoading(false);
             }
         },
-        [address, getStoredAuth]
+        [address, authFetch]
     );
 
     return {
         isLoading,
         error,
-        // User operations
+        authFetch,
         getUser,
         saveUser,
-        // Event operations
         getEvents,
         getDrafts,
         getMyEvents,

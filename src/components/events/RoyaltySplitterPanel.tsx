@@ -5,6 +5,7 @@ import { useAccount, useWriteContract, useSwitchChain } from "wagmi";
 import { formatEther } from "viem";
 import { getPublicClient } from "wagmi/actions";
 import { config } from "@/config/wagmi-client";
+import { useAuth } from "@/components/providers/AuthProvider";
 import {
     RoyaltySplitterABI,
     TicketMarketplaceABI,
@@ -58,6 +59,7 @@ function DirectClaimPanel({
     const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
     const { switchChainAsync } = useSwitchChain();
+    const { getAccessToken } = useAuth();
 
     const contracts = getContractsForChain(eventChainId);
     const explorerUrl = getExplorerUrl(eventChainId);
@@ -158,9 +160,13 @@ function DirectClaimPanel({
 
             // Sync to Supabase
             try {
+                const token = await getAccessToken();
+                const headers: Record<string, string> = { "Content-Type": "application/json" };
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+
                 await fetch(`/api/events/${eventId}/royalties`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers,
                     body: JSON.stringify({
                         tx_hash: hash,
                         action: "direct_claim",
@@ -357,6 +363,7 @@ export function RoyaltySplitterPanel({
     const { address, chain } = useAccount();
     const { writeContractAsync } = useWriteContract();
     const { switchChainAsync } = useSwitchChain();
+    const { getAccessToken } = useAuth();
 
     const contracts = getContractsForChain(eventChainId);
     const explorerUrl = getExplorerUrl(eventChainId);
@@ -461,9 +468,13 @@ export function RoyaltySplitterPanel({
                 })
             );
 
+            const token = await getAccessToken();
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
             const res = await fetch(`/api/events/${eventId}/royalties`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({
                     tx_hash: txHash,
                     action,

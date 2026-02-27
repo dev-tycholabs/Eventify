@@ -6,10 +6,10 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?logo=next.js)](https://nextjs.org/)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.25-blue?logo=solidity)](https://soliditylang.org/)
-[![Multi-Chain](https://img.shields.io/badge/Multi--Chain-EVM-blueviolet)]()
+[![Multi-Chain](https://img.shields.io/badge/Multi--Chain-7_Testnets-blueviolet)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> Currently live on **Etherlink Shadownet** and **Ethereum Sepolia**, with more chains coming soon.
+> Currently live on **7 EVM testnets**: Etherlink Shadownet, Ethereum Sepolia, Avalanche Fuji, Polygon Amoy, Base Sepolia, Optimism Sepolia, and Unichain Sepolia — with more chains coming soon.
 
 ## 🌟 Overview
 
@@ -30,9 +30,10 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 - **👥 Attendee Management** — View attendees grouped by wallet with ticket counts, usage status, and profile info
 - **🎟️ Batch Ticket Operations** — Batch mark tickets as used, bulk purchase multiple tickets
 - **📸 Media Gallery** — Upload cover images, gallery images, and videos to IPFS via Pinata
-- **🌐 Multi-Chain Deployment** — Deploy events on any supported EVM chain (currently Etherlink Shadownet and Sepolia, more coming soon)
+- **🌐 Multi-Chain Deployment** — Deploy events on any supported EVM chain (currently 7 testnets, more coming soon)
 - **💸 Fund Withdrawal** — Withdraw ticket sale proceeds directly from event contracts
 - **📋 Event Preview** — Preview event details before publishing with full media and metadata display
+- **⚙️ Event Management Modal** — Dedicated management modal for organizers with quick actions and event controls
 
 #### For Attendees
 - **🎟️ NFT Tickets** — Own your tickets as blockchain-verified ERC-721 NFTs with on-chain metadata
@@ -48,9 +49,10 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 - **🔗 Multi-Chain Balances** — View claimable resale earnings across all supported chains
 - **💰 Resale Earnings** — Claim funds from marketplace sales per chain with detailed earnings breakdown
 - **🎫 Individual Ticket View** — Dedicated ticket detail page with event info, status, QR code, and action buttons
+- **📜 Ticket History Modal** — View complete transaction history for individual tickets in a dedicated modal
 
 #### Under the Hood
-- **🔐 Wallet Authentication** — Secure sign-in with Web3 wallets via message signing, with 24-hour session persistence
+- **🔐 SIWE + JWT Authentication** — Secure Sign-In with Ethereum (EIP-4361) with JWT access tokens (15-minute expiry) and refresh tokens (7-day expiry) with automatic rotation, HttpOnly cookies, and Next.js middleware-based API route protection
 - **📸 Media Management** — Upload event images and videos to IPFS via Pinata with group management
 - **🌐 Multi-timezone Support** — Events displayed in local timezones with GMT offset picker
 - **📊 Transaction History** — Complete audit trail of all ticket operations with chain-aware indexing
@@ -62,6 +64,9 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 - **📄 Event Comments** — Public comment section on event pages with user profiles
 - **🛡️ Error Boundary** — Graceful error handling with recovery UI
 - **🔍 Username Availability Check** — Real-time username uniqueness validation during profile setup
+- **🔑 Nonce-Based Auth** — Server-generated single-use nonces with 5-minute expiry stored in DB, preventing replay attacks
+- **🔄 Token Rotation** — Refresh token family tracking with automatic revocation on reuse detection (token theft protection)
+- **🛡️ API Middleware** — Next.js edge middleware validates JWT on all mutating API requests, injecting authenticated wallet address into request headers
 
 ### 🔭 Vision: Where Eventify Is Headed
 
@@ -71,7 +76,7 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 | **Payments** | Card payments and fiat on-ramps so non-crypto users can buy tickets seamlessly |
 | **API-as-a-Service** | REST API, SDK, and embeddable widgets so existing Web2 ticketing platforms can add NFT tickets without a rebuild |
 | **Smart Wallets** | Embedded wallets auto-created on signup, removing the Web3 onboarding barrier |
-| **More Chains** | Chain-agnostic architecture — Avalanche, Polygon, Arbitrum, Base, and any EVM chain can be added by deploying contracts and updating one config file |
+| **More Chains** | Chain-agnostic architecture — Arbitrum, and any other EVM chain can be added by deploying contracts and updating one config file |
 
 ---
 
@@ -83,9 +88,11 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 - **Framework**: Next.js 16.1.6 (React 19.2.3) with App Router
 - **Styling**: Tailwind CSS 4
 - **Web3**: wagmi 2.19.5, viem 2.45.1, RainbowKit 2.2.10
+- **Authentication**: SIWE (Sign-In with Ethereum) 3.0.0, jose (JWT)
 - **State Management**: TanStack Query 5.90.20
 - **Database**: Supabase (PostgreSQL + Realtime)
 - **Storage**: Pinata (IPFS) for decentralized media
+- **Chain Icons**: @web3icons/react 4.1.17
 - **PDF/Image Export**: jsPDF, html2canvas, qrcode
 - **QR Scanning**: html5-qrcode
 - **Notifications**: react-hot-toast
@@ -99,7 +106,7 @@ The MVP proves the core loop — mint, buy, sell, verify, chat — all on-chain.
 
 #### Blockchain (Multi-Chain, EVM-Compatible)
 
-Eventify is chain-agnostic — deploy the same contract suite to any EVM chain and register it in one config file. Currently live on:
+Eventify is chain-agnostic — deploy the same contract suite to any EVM chain and register it in one config file. Currently deployed on:
 
 | Network | Chain ID | Currency | Status |
 |---|---|---|---|
@@ -113,7 +120,44 @@ Eventify is chain-agnostic — deploy the same contract suite to any EVM chain a
 | Etherlink Testnet | 128123 | XTZ | Configured |
 | Etherlink Mainnet | 42793 | XTZ | Ready |
 
-> Avalanche, Polygon, Arbitrum, Base, and other EVM chains can be added with zero frontend changes.
+> Any EVM chain can be added with zero frontend changes — just deploy contracts and update the config.
+
+### Authentication Architecture
+
+Eventify uses a SIWE (Sign-In with Ethereum) + JWT authentication system with refresh token rotation:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Authentication Flow                           │
+│                                                                      │
+│  1. GET /api/auth/nonce?address=0x...                               │
+│     → Server generates single-use nonce (5-min expiry)              │
+│     → Stored in auth_nonces table                                   │
+│                                                                      │
+│  2. Wallet signs SIWE message (EIP-4361) containing nonce           │
+│                                                                      │
+│  3. POST /api/auth/login { message, signature }                     │
+│     → Server verifies SIWE signature + nonce validity               │
+│     → Issues JWT access token (15 min) + refresh token (7 days)     │
+│     → Refresh token stored as SHA-256 hash in refresh_tokens table  │
+│     → Refresh token set as HttpOnly cookie                          │
+│     → Access token returned in response body                        │
+│                                                                      │
+│  4. API requests include: Authorization: Bearer <accessToken>       │
+│     → Next.js middleware validates JWT on all mutating requests      │
+│     → Injects x-auth-address header for route handlers              │
+│                                                                      │
+│  5. POST /api/auth/refresh (automatic, 2 min before expiry)         │
+│     → Reads refresh token from HttpOnly cookie                      │
+│     → Validates against DB (hash match, not revoked, not expired)   │
+│     → Rotates: old token revoked, new pair issued                   │
+│     → Token family tracking detects reuse (theft protection)        │
+│                                                                      │
+│  6. POST /api/auth/logout                                           │
+│     → Revokes all refresh tokens for the wallet                     │
+│     → Clears HttpOnly cookie                                        │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
 ### Smart Contract Architecture
 
@@ -162,9 +206,10 @@ Eventify is chain-agnostic — deploy the same contract suite to any EVM chain a
               └──────────────────────────────────────┘
 ```
 
-### Database Schema (10 Tables)
+### Database Schema (12 Tables)
 
 ```sql
+-- Core Application Tables
 users                    -- Wallet address, username, name, email, contact, bio, avatar
 events                   -- Event metadata, chain_id, contract address, media, location, timezone, event_type
 user_tickets             -- Token ownership per chain, usage status, listing status
@@ -174,9 +219,18 @@ royalty_recipients       -- Per-event royalty split config with earned/claimed t
 royalty_distributions    -- Immutable audit trail of on-chain distributions with per-recipient breakdown
 comments                 -- Public event comments with user profiles
 chat_messages            -- Token-gated real-time chat with reply, edit, soft-delete support
+
+-- Authentication Tables
+auth_nonces              -- Single-use SIWE nonces with 5-minute expiry per wallet address
+refresh_tokens           -- JWT refresh tokens with SHA-256 hashing, family tracking, and revocation support
+
+-- Location Tables (pre-populated reference data)
+countries                -- Country reference data with ISO codes, currency, coordinates
+states                   -- State/province reference data linked to countries
+cities                   -- City reference data with coordinates, linked to states and countries
 ```
 
-All tables have Row Level Security (RLS) enabled, proper indexes for chain-aware queries, and auto-updating timestamps via triggers.
+All core tables have Row Level Security (RLS) enabled, proper indexes for chain-aware queries, and auto-updating timestamps via triggers.
 
 ---
 
@@ -217,7 +271,7 @@ Create `.env.local` in the root directory:
 # WalletConnect
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 
-# JWT Secret
+# JWT Secret (used for SIWE auth tokens)
 JWT_SECRET=your_strong_random_secret
 
 # Supabase
@@ -235,24 +289,34 @@ PINATA_GATEWAY=your_gateway_domain
 
 5. **Set up Supabase database**
 
-Run the SQL schema in your Supabase SQL Editor:
+Run the SQL schemas in your Supabase SQL Editor:
 ```sql
--- Use the complete schema (includes all tables, indexes, RLS, functions, triggers, and realtime)
+-- 1. Core application schema (tables, indexes, RLS, functions, triggers, realtime)
 -- File: supabase/setup_full_schema.sql
+
+-- 2. Authentication tables (auth_nonces, refresh_tokens)
+-- File: supabase/supabase-auth-migration.sql
 ```
 
-6. **Deploy smart contracts** (Optional — contracts are already deployed on Etherlink Shadownet and Sepolia)
+6. **Deploy smart contracts** (Optional — contracts are already deployed on 7 testnets)
 
 ```bash
 cd nft-marketplace-Marketplace
 cp .env.example .env
-# Add your PRIVATE_KEY (and optionally SEPOLIA_RPC_URL) to .env
+# Add your PRIVATE_KEY (and optionally RPC URLs) to .env
 
 # Deploy to Etherlink Shadownet
 npm run deploy:etherlink-testnet
 
 # Deploy to Sepolia
 npm run deploy:sepolia
+
+# Deploy to other chains (use hardhat directly)
+npx hardhat run scripts/deploy-ticketing.js --network avalancheFuji
+npx hardhat run scripts/deploy-ticketing.js --network polygonAmoy
+npx hardhat run scripts/deploy-ticketing.js --network baseSepolia
+npx hardhat run scripts/deploy-ticketing.js --network optimismSepolia
+npx hardhat run scripts/deploy-ticketing.js --network unichainSepolia
 
 cd ..
 ```
@@ -270,7 +334,7 @@ Visit `http://localhost:3000` to see the application.
 
 ### Deployed Contracts
 
-Contracts are currently deployed on two networks. The same contract suite can be deployed to any EVM chain.
+Contracts are deployed on 7 testnets. The same contract suite can be deployed to any EVM chain.
 
 #### Etherlink Shadownet (Chain ID: 127823)
 
@@ -290,6 +354,51 @@ Contracts are currently deployed on two networks. The same contract suite can be
 | Registry | `0xC1478b5dfb5D04B6FcdD0FF5c4ef366c80A3A424` |
 | RoyaltySplitterImpl | `0xDE542c4b4A961f91DAB6723Eb2F67124D2EEdA9C` |
 
+#### Avalanche Fuji (Chain ID: 43113)
+
+| Contract | Address |
+|---|---|
+| EventFactory | `0x167582d206972f9b053D3e9Ec2CFA945Ab2b5bf6` |
+| TicketMarketplace | `0x053E1951307B0f9f87E6054E87754D877306386c` |
+| Registry | `0xa0FfD7DAE3c011E737fc1326cACD1b784278A721` |
+| RoyaltySplitterImpl | `0x408DfB52e37539C639618BC28AeBD933E878ef77` |
+
+#### Polygon Amoy (Chain ID: 80002)
+
+| Contract | Address |
+|---|---|
+| EventFactory | `0x408DfB52e37539C639618BC28AeBD933E878ef77` |
+| TicketMarketplace | `0xa0FfD7DAE3c011E737fc1326cACD1b784278A721` |
+| Registry | `0x322eC36AD2F8257cc312d0Cc9550afB6eD9e945A` |
+| RoyaltySplitterImpl | `0x053E1951307B0f9f87E6054E87754D877306386c` |
+
+#### Base Sepolia (Chain ID: 84532)
+
+| Contract | Address |
+|---|---|
+| EventFactory | `0x8aB53d30Db4043f4ee0f43564B6595B3D3BC092E` |
+| TicketMarketplace | `0x1F350D999Db98BF7DCb51b231ef992AeBA8aacAA` |
+| Registry | `0xF653f0cA2205366283Ce28f0CE2018b47D8A9995` |
+| RoyaltySplitterImpl | `0x7a7365b0709de89d1Cf8fEB11BC0Aa8207486204` |
+
+#### Optimism Sepolia (Chain ID: 11155420)
+
+| Contract | Address |
+|---|---|
+| EventFactory | `0x64fFDeE582187975b84E7Bba189D380D2289Dd6E` |
+| TicketMarketplace | `0x403D7d92024Cb6Be2Ff71866B635FBB086a789b3` |
+| Registry | `0x94160b094d53357180Fe952F2083C8247200c978` |
+| RoyaltySplitterImpl | `0x9Acd700c94d91D9155d1EE3b6cd21f31D0b6D244` |
+
+#### Unichain Sepolia (Chain ID: 1301)
+
+| Contract | Address |
+|---|---|
+| EventFactory | `0x64fFDeE582187975b84E7Bba189D380D2289Dd6E` |
+| TicketMarketplace | `0x403D7d92024Cb6Be2Ff71866B635FBB086a789b3` |
+| Registry | `0x94160b094d53357180Fe952F2083C8247200c978` |
+| RoyaltySplitterImpl | `0x9Acd700c94d91D9155d1EE3b6cd21f31D0b6D244` |
+
 ### Deployment Configuration
 
 | Parameter | Value |
@@ -306,7 +415,7 @@ Adding a new EVM chain requires no frontend code changes — just config and dep
 2. Add contract addresses to `CHAIN_CONTRACTS` after deployment
 3. Add the chain to `SUPPORTED_CHAINS` array
 4. Configure the network in `nft-marketplace-Marketplace/hardhat.config.js`
-5. Run `npm run deploy:<network>` from the contracts directory
+5. Run `npx hardhat run scripts/deploy-ticketing.js --network <network>` from the contracts directory
 6. The deployment script auto-updates frontend contract addresses
 
 The entire frontend (wallet dashboard, marketplace, verification, ticket display, chain filter UI) adapts automatically.
@@ -334,6 +443,7 @@ Management dashboard per event includes:
 - Royalty splitter panel with claim/distribute actions
 - Resale listings overview
 - Fund withdrawal
+- Event management modal with quick actions
 
 ### 2. NFT Tickets
 
@@ -346,6 +456,7 @@ Each ticket is an ERC-721 NFT with:
 - Royalty configuration (ERC-2981)
 - Batch purchase support (buy multiple tickets in one tx)
 - Downloadable as styled PNG or PDF with embedded verification QR code
+- Individual ticket history modal showing complete transaction trail
 
 ### 3. Secondary Marketplace
 
@@ -356,6 +467,7 @@ Each ticket is an ERC-721 NFT with:
 - Cancel listings anytime
 - Chain filter to browse listings per network
 - Pagination with configurable page sizes
+- Empty state with navigation to event browsing
 
 ### 4. Wallet Dashboard
 
@@ -404,7 +516,7 @@ Flexible royalty system:
 Find events by:
 - **Nearby**: Events within configurable radius (10–500 km) using browser geolocation
 - **City Search**: Autocomplete city search across countries
-- **Calendar**: Filter by specific dates with visual date picker
+- **Calendar**: Filter by specific dates with visual calendar picker
 - **Distance**: Shows distance from your location on event cards
 - **Chain Filter**: Filter events by blockchain network
 
@@ -412,10 +524,15 @@ Find events by:
 
 ## 🔐 Security Features
 
+- **SIWE Authentication**: EIP-4361 Sign-In with Ethereum for cryptographic wallet verification
+- **JWT Token System**: Short-lived access tokens (15 min) with automatic refresh, reducing exposure window
+- **Refresh Token Rotation**: Each refresh issues a new token pair; old tokens are revoked. Token family tracking detects reuse (theft indicator)
+- **HttpOnly Cookies**: Refresh tokens stored in HttpOnly, Secure, SameSite=Strict cookies — inaccessible to JavaScript
+- **Nonce Protection**: Server-generated single-use nonces with 5-minute expiry prevent replay attacks
+- **API Middleware**: Next.js edge middleware validates JWT on all mutating API requests before they reach route handlers
 - **OpenZeppelin Contracts**: Battle-tested ERC-721, ERC-2981, ReentrancyGuard, Ownable
 - **Price Cap Protection**: On-chain enforcement prevents ticket scalping
-- **Wallet Authentication**: Message signing with 24-hour session persistence
-- **Row Level Security**: Supabase RLS policies on all 10 tables
+- **Row Level Security**: Supabase RLS policies on all core tables
 - **Input Validation**: Client and server-side validation on all API routes
 - **Reentrancy Guards**: Protection on all state-changing contract functions
 - **Access Control**: Organizer-only functions for event management
@@ -427,7 +544,7 @@ Find events by:
 ## 📱 User Flows
 
 ### Organizer Flow
-1. Connect wallet → auto sign-in with message signature
+1. Connect wallet → SIWE sign-in with message signature → JWT session established
 2. Create event with details, media, location, and ticketing config
 3. Preview event before publishing
 4. Configure royalty recipients (optional multi-split)
@@ -438,7 +555,7 @@ Find events by:
 9. Withdraw primary sale proceeds from event contract
 
 ### Attendee Flow
-1. Connect wallet → auto sign-in
+1. Connect wallet → SIWE sign-in → session auto-refreshes
 2. Browse events by location, date, or chain
 3. Purchase tickets (NFTs minted to wallet)
 4. View tickets in dashboard with chain filtering
@@ -459,7 +576,12 @@ Find events by:
 eventify/
 ├── src/
 │   ├── app/                          # Next.js App Router
-│   │   ├── api/                      # 20+ API route handlers
+│   │   ├── api/                      # 25+ API route handlers
+│   │   │   ├── auth/                 # SIWE + JWT authentication
+│   │   │   │   ├── nonce/            # GET - Generate single-use nonce
+│   │   │   │   ├── login/            # POST - Verify SIWE signature, issue JWT pair
+│   │   │   │   ├── refresh/          # POST - Rotate refresh token, issue new access token
+│   │   │   │   └── logout/           # POST - Revoke all refresh tokens, clear cookie
 │   │   │   ├── chat/                 # Chat messages + chat events list
 │   │   │   ├── comments/             # Event comments CRUD
 │   │   │   ├── events/               # Events CRUD + attendees + royalties
@@ -480,14 +602,14 @@ eventify/
 │   │   ├── ticket/[eventId]/[tokenId]/ # Individual ticket detail
 │   │   ├── verify/                   # Multi-chain ticket verification
 │   │   └── wallet/                   # Wallet dashboard + per-chain earnings
-│   ├── components/                   # 60+ React components
-│   │   ├── dashboard/                # TicketCard, TicketDetailModal, TicketGalleryFromDB, TransactionHistory
-│   │   ├── events/                   # ChatRoom, CommentSection, EventCard, EventManageCard, EventTicketScanner, RoyaltySplitterPanel, EventAttendeesPanel, WalletQRScanner
-│   │   ├── landing/                  # HeroSection, FeaturesGrid, HowItWorks, Footer
-│   │   ├── marketplace/              # BuyTicketModal, ListTicketModal, TransferTicketModal, ListingCard, ListingGrid
+│   ├── components/                   # 65+ React components
+│   │   ├── dashboard/                # TicketCard, TicketDetailModal, TicketGalleryFromDB, TicketHistoryModal, TransactionHistory, TransactionHistoryFromDB
+│   │   ├── events/                   # ChatRoom, CommentSection, EmptyState, EventAttendeesPanel, EventCalendarFilter, EventCard, EventCardSkeleton, EventManageCard, EventManageModal, EventTicketScanner, RoyaltySplitterPanel, WalletQRScanner
+│   │   ├── landing/                  # HeroSection, FeaturesGrid, HowItWorks, Footer, SupportedChains
+│   │   ├── marketplace/              # BuyTicketModal, ListTicketModal, TransferTicketModal, ListingCard, ListingCardSkeleton, ListingGrid, MarketplaceEmptyState
 │   │   ├── profile/                  # ProfileForm, QRCodeModal
 │   │   ├── providers/                # Web3Provider, AuthProvider, GeolocationProvider
-│   │   ├── ui/                       # ChainFilter, Pagination, PageSizeSelector, StyledSelect
+│   │   ├── ui/                       # ChainFilter, Pagination, StyledSelect
 │   │   ├── verify/                   # QRScanner, VerificationForm, VerificationResult
 │   │   ├── wallet/                   # WalletDashboard
 │   │   └── [shared]                  # Header, WalletConnect, ErrorBoundary, ToastProvider, DateTimePicker, GmtOffsetPicker, LocationPicker, EventTypeSelect, TransactionStatus, PageSkeleton
@@ -503,6 +625,9 @@ eventify/
 │   │   ├── useGeolocation.ts         # Browser geolocation + reverse geocoding
 │   │   └── [+ 10 more data hooks]
 │   ├── lib/                          # Supabase client/server, auth, multi-chain verify, API sync
+│   │   ├── auth/                     # JWT signing/verification, middleware helper, wallet verification
+│   │   ├── api/                      # Sync utilities
+│   │   └── supabase/                 # Client, server, types (12 table definitions)
 │   ├── styles/                       # Theme configuration
 │   ├── types/                        # TypeScript types (Event, Ticket, MarketplaceListing, errors)
 │   └── utils/                        # Ticket download (PNG/PDF), toast helpers
@@ -516,10 +641,11 @@ eventify/
 │   │   ├── Marketplace.sol           # Base marketplace logic
 │   │   └── interfaces/               # IEventTicket, INFT, IRegistry
 │   ├── scripts/                      # deploy-ticketing.js, export-abis.js
-│   └── deployments/                  # etherlinkTestnet.json, sepolia.json, hardhat.json
+│   └── deployments/                  # 8 deployment files (7 testnets + hardhat)
 ├── supabase/
 │   ├── setup_full_schema.sql         # Complete DB setup (tables, indexes, RLS, functions, triggers, realtime)
-│   └── migrations/                   # 14 incremental migrations including multi-chain support
+│   ├── supabase-auth-migration.sql   # Auth tables (auth_nonces, refresh_tokens)
+│   └── migrations/                   # 14 incremental migrations + auth migration
 └── public/                           # Static assets
 ```
 
@@ -554,46 +680,52 @@ npm start
 
 ## 🌐 API Routes
 
+### Authentication
+- `GET /api/auth/nonce?address=0x...` — Generate single-use nonce for SIWE sign-in (5-min expiry)
+- `POST /api/auth/login` — Verify SIWE signature, validate nonce, issue JWT access + refresh tokens
+- `POST /api/auth/refresh` — Rotate refresh token (from HttpOnly cookie), issue new token pair
+- `POST /api/auth/logout` — Revoke all refresh tokens for wallet, clear cookie
+
 ### Events
 - `GET /api/events` — List events with filters (status, chain, location, date, nearby)
-- `POST /api/events` — Create event (draft or published)
+- `POST /api/events` — Create event (draft or published) *(auth required)*
 - `GET /api/events/[id]` — Get event details with resale listings
-- `PATCH /api/events/[id]` — Update event
-- `DELETE /api/events/[id]` — Delete draft event
+- `PATCH /api/events/[id]` — Update event *(auth required)*
+- `DELETE /api/events/[id]` — Delete draft event *(auth required)*
 - `GET /api/events/[id]/attendees` — Get attendees grouped by wallet with profiles
 - `GET /api/events/[id]/royalties` — Get royalty data and distribution history
-- `POST /api/events/[id]/royalties` — Record royalty distribution
+- `POST /api/events/[id]/royalties` — Record royalty distribution *(auth required)*
 
 ### Tickets
-- `POST /api/tickets` — Sync ticket ownership to database
+- `POST /api/tickets` — Sync ticket ownership to database *(auth required)*
 - `GET /api/tickets?owner=address` — Get user tickets with chain filtering
 - `GET /api/tickets/[contract]/[tokenId]` — Get specific ticket details
 - `GET /api/tickets/by-event/[eventId]/[tokenId]` — Get ticket by event and token
 
 ### Marketplace
 - `GET /api/marketplace` — Get active listings with chain filtering
-- `POST /api/marketplace` — Create/update listing status
+- `POST /api/marketplace` — Create/update listing status *(auth required)*
 
 ### Transactions
-- `POST /api/transactions` — Record transaction (purchase, sale, listing, transfer, cancel, use)
+- `POST /api/transactions` — Record transaction (purchase, sale, listing, transfer, cancel, use) *(auth required)*
 
 ### Users
 - `GET /api/users?address=0x...` — Get user by wallet address
 - `GET /api/users?username=name` — Get user by username
-- `POST /api/users` — Create/update user profile with signature verification
+- `POST /api/users` — Create/update user profile *(auth required)*
 - `GET /api/users/check-username?username=xxx` — Check username availability
 
 ### Chat
 - `GET /api/chat?event_id=...` — Get chat messages for event
-- `POST /api/chat` — Send message (with ticket ownership verification)
-- `PATCH /api/chat` — Edit message
-- `DELETE /api/chat` — Soft-delete message
+- `POST /api/chat` — Send message (with ticket ownership verification) *(auth required)*
+- `PATCH /api/chat` — Edit message *(auth required)*
+- `DELETE /api/chat` — Soft-delete message *(auth required)*
 - `GET /api/chat/events?user_address=...` — Get events where user can chat (ticket holder or organizer) with last message preview
 
 ### Comments
 - `GET /api/comments?event_id=...` — Get event comments with user profiles
-- `POST /api/comments` — Create comment
-- `DELETE /api/comments?id=...&user_address=...` — Delete own comment
+- `POST /api/comments` — Create comment *(auth required)*
+- `DELETE /api/comments?id=...&user_address=...` — Delete own comment *(auth required)*
 
 ### Locations
 - `GET /api/locations?type=countries` — Get all countries
@@ -605,7 +737,7 @@ npm start
 - `GET /api/wallet/royalties?address=0x...` — Get royalty events for address with event details
 
 ### Upload
-- `POST /api/upload` — Upload file to IPFS via Pinata
+- `POST /api/upload` — Upload file to IPFS via Pinata *(auth required)*
 
 ---
 
@@ -613,18 +745,21 @@ npm start
 
 - **Responsive Design**: Mobile-first approach with adaptive layouts
 - **Dark Theme**: Modern dark UI with purple/pink gradient accents
-- **Loading States**: Skeleton loaders (PageSkeleton, EventCardSkeleton, ListingCardSkeleton)
+- **Loading States**: Skeleton loaders (PageSkeleton with grid/detail/default variants, EventCardSkeleton, ListingCardSkeleton)
+- **Empty States**: Contextual empty states for events and marketplace with navigation CTAs
 - **Error Handling**: Error boundaries with recovery, user-friendly error messages
 - **Toast Notifications**: Real-time feedback for transactions and actions via react-hot-toast
-- **Modal Dialogs**: Ticket detail, buy confirmation, list for sale, transfer, QR code display
+- **Modal Dialogs**: Ticket detail, ticket history, buy confirmation, list for sale, transfer, QR code display, event management
 - **QR Code Generation**: For tickets (with verification URL), profiles, and wallet addresses
 - **Ticket Download**: Styled PNG and PDF export with embedded QR codes
 - **Smooth Animations**: Tailwind transitions and hover effects
 - **Pagination**: Configurable page sizes (6/12/24/48) with ellipsis navigation
-- **Chain Badges**: Visual chain identification on event cards, tickets, and listings
+- **Chain Badges**: Visual chain identification with web3icons on event cards, tickets, and listings
+- **Supported Chains Display**: Landing page section showing all 7 deployed testnets with branded chain icons
 - **Status Badges**: Color-coded status indicators (Valid, Used, Listed, Expired, Sold Out, Live, Upcoming, Past)
 - **Distance Display**: Proximity badges on event cards when geolocation is available
 - **Geolocation Header**: Current city display in the navigation bar
+- **Calendar Filter**: Visual calendar picker with event date indicators for date-based filtering
 
 ---
 
@@ -674,7 +809,7 @@ npm start
 - [ ] Sandbox environment — testnet-backed staging for integrators
 
 ### 🌐 Phase 6 — Scale & Ecosystem
-- [ ] More chains (Avalanche, Polygon, Arbitrum, Base — deploy where the audience is)
+- [ ] More chains (Arbitrum and other EVM chains — deploy where the audience is)
 - [ ] Mobile app (React Native with embedded wallet)
 - [ ] Bulk ticket operations (batch mint, airdrop, corporate group buys)
 - [ ] Event templates (one-click setup for common event types)
@@ -730,13 +865,14 @@ For support, please open an issue in the GitHub repository or contact the team.
 | Metric | Count |
 |---|---|
 | Smart Contracts | 6 contracts + 3 interfaces |
-| React Components | 60+ components |
+| React Components | 65+ components |
 | Custom Hooks | 18 hooks |
-| API Routes | 20+ endpoints |
-| Database Tables | 10 tables |
-| Database Migrations | 14 migrations |
-| Supported Chains | 2 live (Etherlink Shadownet + Sepolia), any EVM chain supported |
+| API Routes | 25+ endpoints (including 4 auth routes) |
+| Database Tables | 12 tables (9 core + 2 auth + 3 location reference) |
+| Database Migrations | 15 migrations (14 incremental + 1 auth) |
+| Supported Chains | 7 deployed testnets (any EVM chain supported) |
 | Pages/Routes | 12 page routes |
+| Auth System | SIWE + JWT with refresh token rotation |
 
 ---
 

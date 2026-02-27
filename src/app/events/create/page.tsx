@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useEventFactory } from "@/hooks/useEventFactory";
 import { useSupabase } from "@/hooks/useSupabase";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { GmtOffsetPicker, getDefaultGmtOffset } from "@/components/GmtOffsetPicker";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { LocationPicker } from "@/components/LocationPicker";
@@ -35,6 +36,7 @@ export default function CreateEventPage() {
     const { address, isConnected } = useAccount();
     const { createEvent, isLoading, error } = useEventFactory();
     const { saveDraft: saveDraftToSupabase, publishEvent, getEvents } = useSupabase();
+    const { getAccessToken } = useAuth();
     const { explorerUrl, currencySymbol } = useChainConfig();
 
     const [form, setForm] = useState<EventCreationForm>({
@@ -397,12 +399,14 @@ export default function CreateEventPage() {
         setImageUploadError(null);
 
         try {
+            const token = await getAccessToken();
             const formData = new FormData();
             formData.append("file", file);
             formData.append("name", `event-${form.name || "image"}-${Date.now()}`);
 
             const response = await fetch("/api/upload", {
                 method: "POST",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -439,12 +443,14 @@ export default function CreateEventPage() {
         setCoverImageUploadError(null);
 
         try {
+            const token = await getAccessToken();
             const formData = new FormData();
             formData.append("file", file);
             formData.append("name", `event-cover-${form.name || "image"}-${Date.now()}`);
 
             const response = await fetch("/api/upload", {
                 method: "POST",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 
@@ -508,6 +514,7 @@ export default function CreateEventPage() {
         setForm(prev => ({ ...prev, mediaFiles: [...prev.mediaFiles, ...newMediaFiles] }));
 
         // Upload each file
+        const uploadToken = await getAccessToken();
         for (const mediaFile of newMediaFiles) {
             try {
                 const formData = new FormData();
@@ -517,6 +524,7 @@ export default function CreateEventPage() {
 
                 const response = await fetch("/api/upload", {
                     method: "POST",
+                    headers: uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {},
                     body: formData,
                 });
 

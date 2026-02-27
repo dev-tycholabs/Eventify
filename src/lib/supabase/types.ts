@@ -45,6 +45,60 @@ export interface Database {
     };
     public: {
         Tables: {
+            auth_nonces: {
+                Row: {
+                    id: string;
+                    wallet_address: string;
+                    nonce: string;
+                    expires_at: string;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    wallet_address: string;
+                    nonce: string;
+                    expires_at: string;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    wallet_address?: string;
+                    nonce?: string;
+                    expires_at?: string;
+                    created_at?: string;
+                };
+                Relationships: [];
+            };
+            refresh_tokens: {
+                Row: {
+                    id: string;
+                    wallet_address: string;
+                    token_hash: string;
+                    token_family: string;
+                    is_revoked: boolean;
+                    expires_at: string;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    wallet_address: string;
+                    token_hash: string;
+                    token_family: string;
+                    is_revoked?: boolean;
+                    expires_at: string;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    wallet_address?: string;
+                    token_hash?: string;
+                    token_family?: string;
+                    is_revoked?: boolean;
+                    expires_at?: string;
+                    created_at?: string;
+                };
+                Relationships: [];
+            };
             chat_messages: {
                 Row: {
                     id: string;

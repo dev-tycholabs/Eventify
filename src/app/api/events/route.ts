@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { verifyWalletSignature } from "@/lib/auth/verify-wallet";
 import type { EventStatus, EventType, UpdateTables, InsertTables, MediaFileJson, Tables } from "@/lib/supabase/types";
 
 type EventWithRecipients = Tables<"events"> & {
@@ -264,15 +263,22 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST /api/events - Create or update an event
+// POST /api/events - Create or update an event (JWT protected via middleware)
 export async function POST(request: NextRequest) {
     try {
+        // Address comes from JWT via middleware
+        const address = request.headers.get("x-auth-address");
+
+        if (!address) {
+            return NextResponse.json(
+                { error: "Authentication required" },
+                { status: 401 }
+            );
+        }
+
         const body = await request.json();
         const {
-            address,
-            signature,
-            message,
-            event_id, // If provided, update existing event
+            event_id,
             chain_id,
             contract_address,
             name,
@@ -298,25 +304,10 @@ export async function POST(request: NextRequest) {
             status = "draft",
         } = body;
 
-        // Validate required fields
-        if (!address || !signature || !message || !name || !chain_id) {
+        if (!name || !chain_id) {
             return NextResponse.json(
-                { error: "Missing required fields (address, signature, message, name, chain_id)" },
+                { error: "Missing required fields (name, chain_id)" },
                 { status: 400 }
-            );
-        }
-
-        // Verify wallet ownership
-        const isValid = await verifyWalletSignature({
-            address,
-            message,
-            signature,
-        });
-
-        if (!isValid) {
-            return NextResponse.json(
-                { error: "Invalid signature" },
-                { status: 401 }
             );
         }
 
@@ -469,38 +460,31 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// DELETE /api/events?id=...&address=...&signature=...&message=...
+// DELETE /api/events?id=... (JWT protected via middleware)
 export async function DELETE(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get("id");
-        const address = searchParams.get("address");
-        const signature = searchParams.get("signature") as `0x${string}`;
-        const message = searchParams.get("message");
+        const address = request.headers.get("x-auth-address");
 
-        if (!id || !address || !signature || !message) {
+        if (!address) {
             return NextResponse.json(
-                { error: "Missing required parameters" },
-                { status: 400 }
+                { error: "Authentication required" },
+                { status: 401 }
             );
         }
 
-        const isValid = await verifyWalletSignature({
-            address,
-            message,
-            signature,
-        });
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get("id");
 
-        if (!isValid) {
+        if (!id) {
             return NextResponse.json(
-                { error: "Invalid signature" },
-                { status: 401 }
+                { error: "Event id is required" },
+                { status: 400 }
             );
         }
 
         const supabase = createServerClient();
 
-        // Only allow deleting drafts
+        // Only allow deleting drafts owned by the authenticated user
         const { error } = await supabase
             .from("events")
             .delete()
